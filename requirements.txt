@@ -1,0 +1,6 @@
+pyperclip
+requests
+sounddevice
+soundfile
+numpy
+mutagen

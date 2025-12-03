@@ -15,8 +15,8 @@ POST_PAUSE = 0.3
 
 # ─── メタデータ・保存先設定 ───────────────────────────
 # 【ユーザー名】FLACファイルに埋め込むアーティスト名
-# 実行者が自由に設定する名前を想定 (例: Gemini, MyBot など)
-ARTIST_NAME = "Aivis_Log_Source"
+# 実行者が自由に設定する名前を想定 (例: Gemini, MyBot, Aivis など)
+ARTIST_NAME = "YourVoiceAssistant"
 # アルバム名の接頭辞
 ALBUM_PREFIX = "Log"
 # ジャケット画像ファイルのパス
@@ -38,6 +38,12 @@ else:
 # 実際の保存ルート (YYMMDDフォルダは実行時に作成されます)
 SAVE_DIR_ROOT = os.path.join(BASE_DIR, "Aivis_AudioLog")
 
+# ─── 誤爆防止フィルター設定 ───────────────────────────
+# この文字数未満のテキストは読み上げずにスキップします (0で無効)
+MIN_LENGTH = 10
+
+# ひらがなが含まれていないテキスト（URLやコードなど）をスキップします (Trueで有効)
+REQUIRE_HIRAGANA = True
 
 # ─── ユーザー辞書 ───────────────────────────────────
 # 頻繁に読み間違えられる単語やスラングを修正する辞書

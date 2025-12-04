@@ -1,364 +1,390 @@
-"""
-AivisSpeech Clipboard Reader
-=========================================
-クリップボードを監視し、AivisSpeech (または VOICEVOX) を使用して読み上げるツールです。
-
-Features:
-- クリップボードのリアルタイム監視
-- ストリーミング再生（合成しながら再生）
-- 連続コピー時の順次キューイング処理
-- 音声ファイル(FLAC)の自動保存とタグ付け
-- 誤爆防止フィルター（文字数・ひらがなチェック）
-- 緊急停止機能
-
-Author: Unadorned Ohtori
-License: MIT
-"""
-
+import sys
 import time
-import pyperclip
+import json
+import os
+import re
+import queue
+import threading
+import datetime
+import shutil
+import io
+import subprocess
+import numpy as np
 import requests
 import sounddevice as sd
 import soundfile as sf
-import io
-import re
-import os
-import sys
-from datetime import datetime
-import numpy as np
-from threading import Thread, Event
-import queue
-from typing import Optional, Tuple, List
+import pyperclip
+import keyboard
 
-# ─── 設定ファイルの読み込み ────────────────────────
-try:
-    import settings
-except ImportError:
-    print("❌ エラー: 設定ファイル (settings.py) が見つかりません。")
-    print("👉 settings_template.py をコピーして settings.py を作成し、環境に合わせて編集してください。")
-    sys.exit(1)
-
-# ─── ライブラリ依存チェック ────────────────────────
+# FLACタグ編集用 (あれば使う)
 try:
     from mutagen.flac import FLAC, Picture
     from mutagen.id3 import PictureType
     HAS_MUTAGEN = True
 except ImportError:
     HAS_MUTAGEN = False
-    print("⚠️ 注意: 'mutagen' ライブラリが見つかりません。タグとアートワークの埋め込みはスキップされます。")
 
-# ─── Configクラス（settings.pyのラッパー） ──────────
-class Config:
-    """
-    アプリケーション全体の設定を管理するクラス。
-    settings.py の値を参照し、未定義の場合はデフォルト値を提供します。
-    """
-    # 接続設定
-    HOST = settings.HOST
-    PORT = settings.PORT
-    SPEAKER_ID = settings.SPEAKER_ID
+# ★バージョン情報
+__version__ = "0.4.6"
+
+# === グローバル変数・状態管理 ===
+play_queue = queue.Queue()
+stop_event = threading.Event()
+is_paused = False
+config = {}
+
+# ─── 設定管理クラス ────────────────────────
+class ConfigManager:
+    DEFAULT_CONFIG = {
+        "speaker_id": 888753760, "host": "127.0.0.1", "port": 10101,
+        "output_dir": "Aivis_AudioLog", "dropbox_dir": None,
+        "artwork_path": "cover.jpg",
+        "volume": 1.0, "speed": 1.0, "pitch": 0.0, "intonation": 1.0, "post_pause": 0.3,
+        "min_length": 10, "require_hiragana": True, "stop_command": ";;STOP",
+        "hotkeys": {"stop": "ctrl+alt+s", "pause": "ctrl+alt+p"},
+        "tags": {"artist": "AivisReader", "album_prefix": "Log"},
+        "dictionary": {} 
+    }
+
+    def __init__(self):
+        self.data = self.DEFAULT_CONFIG.copy()
+        self.load()
+
+    def load(self):
+        if os.path.exists("config.json"):
+            try:
+                with open("config.json", "r", encoding="utf-8") as f:
+                    self._deep_update(self.data, json.load(f))
+            except Exception as e:
+                print(f"⚠️ config.json 読み込みエラー: {e}")
+
+        if os.path.exists("config.local.json"):
+            try:
+                with open("config.local.json", "r", encoding="utf-8") as f:
+                    self._deep_update(self.data, json.load(f))
+                    print("🔧 config.local.json を適用しました")
+            except Exception as e:
+                print(f"⚠️ config.local.json 読み込みエラー: {e}")
+
+    def _deep_update(self, base_dict, update_dict):
+        for key, value in update_dict.items():
+            if isinstance(value, dict) and key in base_dict and isinstance(base_dict[key], dict):
+                self._deep_update(base_dict[key], value)
+            else:
+                base_dict[key] = value
     
-    # 音声パラメータ
-    VOICE_SPEED = settings.VOICE_SPEED
-    VOICE_INTONATION = settings.VOICE_INTONATION
-    VOICE_PITCH = settings.VOICE_PITCH
-    POST_PAUSE = settings.POST_PAUSE
-
-    # 保存先設定
-    SAVE_DIR_ROOT = settings.SAVE_DIR_ROOT
-    CHECK_INTERVAL = 0.5
+    def get(self, key, default=None):
+        return self.data.get(key, default)
     
-    # メタデータ設定
-    ARTIST_NAME = settings.ARTIST_NAME
-    ALBUM_PREFIX = settings.ALBUM_PREFIX
-    ARTWORK_PATH = settings.ARTWORK_PATH
+    def __getitem__(self, key):
+        return self.data[key]
 
-    # 辞書・コマンド
-    USER_DICT = settings.USER_DICT
-    STOP_COMMAND = getattr(settings, 'STOP_COMMAND', ';;STOP')
+# グローバル設定インスタンス
+cfg = ConfigManager()
 
-    # 誤爆防止フィルター（設定がない場合のデフォルト値も設定）
-    MIN_LENGTH = getattr(settings, 'MIN_LENGTH', 10)
-    REQUIRE_HIRAGANA = getattr(settings, 'REQUIRE_HIRAGANA', True)
-
-# ─── AudioPlayer クラス ────────────────────────────
+# ─── プレーヤー (消費者スレッド) ────────────────
 class AudioPlayer:
     def __init__(self):
-        self.queue: queue.Queue = queue.Queue()
-        self.thread = Thread(target=self._playback_worker, daemon=True)
+        self.queue = queue.Queue()
+        self.stop_flag = threading.Event()
+        self.is_paused = False
+        self.thread = threading.Thread(target=self._worker, daemon=True)
         self.thread.start()
 
-    def _playback_worker(self):
+    def _worker(self):
         while True:
+            if self.stop_flag.is_set():
+                with self.queue.mutex:
+                    self.queue.queue.clear()
+                self.stop_flag.clear()
+
             item = self.queue.get()
-            if item is None: break
-            
             data, sr = item
+            
+            while self.is_paused:
+                time.sleep(0.5)
+
             try:
-                sd.play(data, sr)
-                sd.wait()
+                if not self.stop_flag.is_set():
+                    sd.play(data, sr)
+                    sd.wait()
             except Exception as e:
                 print(f"⚠️ 再生エラー: {e}")
             finally:
                 self.queue.task_done()
 
-    def enqueue(self, data: np.ndarray, sr: int):
+    def enqueue(self, data, sr):
         self.queue.put((data, sr))
 
-    def stop_and_clear(self):
+    def stop_immediate(self):
+        self.stop_flag.set()
         sd.stop()
         with self.queue.mutex:
             self.queue.queue.clear()
+    
+    def toggle_pause(self):
+        self.is_paused = not self.is_paused
+        return self.is_paused
 
-# ─── AivisSynthesizer クラス ───────────────────────
+# ─── 合成器 (API通信 & 保存) ───────────────────
 class AivisSynthesizer:
-    def __init__(self, config):
-        self.cfg = config
-        self.base_url = f'http://{self.cfg.HOST}:{self.cfg.PORT}'
-        os.makedirs(self.cfg.SAVE_DIR_ROOT, exist_ok=True)
-        self.session = requests.Session()
+    def __init__(self):
+        self.base_url = f'http://{cfg["host"]}:{cfg["port"]}'
 
-    def check_connection(self) -> bool:
+    def check_connection(self):
         try:
-            self.session.get(f'{self.base_url}/speakers', timeout=2)
+            requests.get(f'{self.base_url}/speakers', timeout=2)
             return True
         except:
             return False
 
-    def synthesize_segment(self, text: str) -> Optional[Tuple[np.ndarray, int]]:
+    def synthesize(self, text):
         try:
-            q_res = self.session.post(
-                f'{self.base_url}/audio_query',
-                params={'text': text, 'speaker': self.cfg.SPEAKER_ID},
-                timeout=10
-            )
-            if q_res.status_code != 200: return None
+            params = {'text': text, 'speaker': cfg["speaker_id"]}
+            q_res = requests.post(f'{self.base_url}/audio_query', params=params, timeout=5)
+            q_res.raise_for_status()
             
             query = q_res.json()
-            query['speedScale'] = self.cfg.VOICE_SPEED
-            query['intonationScale'] = self.cfg.VOICE_INTONATION
-            query['pitchScale'] = self.cfg.VOICE_PITCH
+            query['speedScale'] = cfg["speed"]
+            query['intonationScale'] = cfg["intonation"]
+            query['pitchScale'] = cfg["pitch"]
+            query['volumeScale'] = cfg["volume"]
+            query['postPhonemeLength'] = cfg["post_pause"]
 
-            w_res = self.session.post(
+            w_res = requests.post(
                 f'{self.base_url}/synthesis',
-                params={'speaker': self.cfg.SPEAKER_ID},
+                params={'speaker': cfg["speaker_id"]},
                 json=query,
                 headers={'Accept': 'audio/wav'},
                 timeout=30
             )
-            if w_res.status_code != 200: return None
+            w_res.raise_for_status()
             
             return sf.read(io.BytesIO(w_res.content))
-        except Exception:
+        except Exception as e:
+            print(f"❌ APIエラー: {e}")
             return None
 
-    def save_merged(self, segments: List[np.ndarray], original_text: str, sr: int):
-        if not segments: return
-        full_audio = np.concatenate(segments)
+    def save_log(self, full_audio, sr, original_text):
+        """FLACで保存し、mutagenでタグ付けを行う"""
         
-        today_str = datetime.now().strftime('%y%m%d')
-        daily_save_dir = os.path.join(self.cfg.SAVE_DIR_ROOT, today_str)
+        root_path = cfg["dropbox_dir"]
+        if not root_path:
+            possible = [os.path.join(os.path.expanduser('~'), p) for p in ['Dropbox', 'OneDrive']]
+            for p in possible:
+                if os.path.exists(p):
+                    root_path = p
+                    break
+        if not root_path: root_path = os.getcwd()
+        
+        daily_date_str = datetime.datetime.now().strftime("%y%m%d")
+        daily_save_dir = os.path.join(root_path, cfg["output_dir"], daily_date_str)
         os.makedirs(daily_save_dir, exist_ok=True)
 
-        # タイトル生成（改行対策）
-        lines = [line.strip() for line in original_text.splitlines() if line.strip()]
-        if lines and (lines[0].startswith('（') or lines[0].startswith('(')):
-            title_source = "".join(lines[1:])
-        else:
-            title_source = "".join(lines)
-        if not title_source: title_source = "NoTitle"
-
-        meta_title = re.sub(r'[^\w\u3002]', '', title_source)
-        sentence_part = title_source.split('。')[0]
-        clean_title = re.sub(r'[^\w]', '', sentence_part)[:20] or "NoTitle"
-
         try:
-            existing_files = [f for f in os.listdir(daily_save_dir) if f.endswith('.flac')]
+            existing_files = [f for f in os.listdir(daily_save_dir) if f.endswith(('.flac', '.ogg'))]
             track_number = len(existing_files) + 1
         except Exception:
             track_number = 1
 
-        timestamp = datetime.now().strftime('%y%m%d%H%M')
-        filename = f"{timestamp}_{clean_title}.flac" 
-        path = os.path.join(daily_save_dir, filename)
+        # ★【修正】メタタイトル生成 (句点以外の記号・スペース削除)
+        # re.sub(r'[^\w\u3002]', '', title_source) のロジックを復旧
+        meta_title = re.sub(r'[^\w\u3002]', '', original_text)
+
+        # ★【修正】ファイル名生成 (最初の「。」まで + 記号削除 + 20文字)
+        # 前回のロジックに戻す
+        sentence_part = original_text.split('。')[0]
+        # ファイル名として不適切な文字も念のため消すが、基本は \w のみ残すロジック
+        clean_title = re.sub(r'[^\w]', '', sentence_part)[:20] or "NoTitle"
+
+        timestamp = datetime.datetime.now().strftime('%y%m%d%H%M%S')
+        filename = f"{timestamp}_{clean_title}.flac"
+        filepath = os.path.join(daily_save_dir, filename)
 
         try:
-            sf.write(path, full_audio, sr, format='FLAC', subtype='PCM_16')
+            # Windows日本語パス対策のため open() で書き込み
+            with open(filepath, 'wb') as f:
+                sf.write(f, full_audio, sr, format='FLAC')
             
             if HAS_MUTAGEN:
-                self._add_metadata(path, meta_title, track_number)
+                audio = FLAC(filepath)
                 
-            print(f"💾 [保存完了] {today_str}/ No.{track_number} - {filename}")
+                current_date_str = datetime.datetime.now().strftime('%y%m%d')
+                
+                # ★メタタイトルを使用
+                audio['title'] = meta_title 
+                audio['artist'] = cfg["tags"]["artist"]
+                audio['album'] = f"{cfg['tags']['album_prefix']}_{current_date_str}"
+                audio['tracknumber'] = str(track_number)
+                
+                artwork = cfg["artwork_path"]
+                if os.path.exists(artwork):
+                    image = Picture()
+                    image.type = PictureType.COVER_FRONT
+                    if artwork.lower().endswith(('.jpg', '.jpeg')):
+                        image.mime = u"image/jpeg"
+                    else:
+                        image.mime = u"image/png"
+                    with open(artwork, 'rb') as f: image.data = f.read()
+                    audio.add_picture(image)
+                    
+                audio.save()
+            
+            print(f"💾 [保存完了] {daily_date_str}/ No.{track_number} - {filename}")
+            
         except Exception as e:
             print(f"⚠️ 保存失敗: {e}")
 
-    def _add_metadata(self, filepath: str, meta_title_text: str, track_num: int):
-        try:
-            audio = FLAC(filepath)
-            
-            current_date_str = datetime.now().strftime('%y%m%d')
-            album_name = f"{self.cfg.ALBUM_PREFIX}_{current_date_str}"
-            
-            audio['artist'] = self.cfg.ARTIST_NAME
-            audio['album'] = album_name
-            audio['title'] = meta_title_text
-            audio['tracknumber'] = str(track_num)
-            
-            if os.path.exists(self.cfg.ARTWORK_PATH):
-                image = Picture()
-                image.type = PictureType.COVER_FRONT
-                if self.cfg.ARTWORK_PATH.lower().endswith(('.jpg', '.jpeg')):
-                    image.mime = u"image/jpeg"
-                else:
-                    image.mime = u"image/png"
-                with open(self.cfg.ARTWORK_PATH, 'rb') as f:
-                    image.data = f.read()
-                audio.add_picture(image)
-            audio.save()
-        except Exception as e:
-            print(f"⚠️ タグ書き込みエラー: {e}")
 
 # ─── TaskManager クラス ──────────────────────────
 class TaskManager:
-    def __init__(self, synth: AivisSynthesizer, player: AudioPlayer):
+    def __init__(self, synth, player):
         self.synth = synth
         self.player = player
-        self.task_queue: queue.Queue = queue.Queue()
-        self.abort_current_flag = Event()
-        self.thread = Thread(target=self._worker, daemon=True)
-        self.thread.start()
+        self.task_queue = queue.Queue()
+        self.stop_current_flag = False
         
-        self.re_ruby = re.compile(r'([一-龠]+)[（\(]([ぁ-んァ-ンー]+)[）\)]')
-        self.re_noise = re.compile(r'[{}#`|>[\]]')
-        self.re_symbols = re.compile(r'[\*=\-]{2,}')
-        self.re_url = re.compile(r'https?://[\w/:%#\$&\?\(\)~\.=\+\-]+')
+        self.thread = threading.Thread(target=self._worker, daemon=True)
+        self.thread.start()
 
-    def add_text(self, text: str):
+    def add_text(self, text):
         self.task_queue.put(text)
         q_size = self.task_queue.qsize()
         if q_size > 1:
-            print(f"📥 キューに追加しました (待機中: {q_size - 1}件)")
+            print(f"📥 キュー待機中: {q_size}件")
 
-    def force_stop_all(self):
-        print("🛑 【緊急停止】キューを全削除し、再生を停止します")
+    def force_stop(self):
+        self.stop_current_flag = True
         with self.task_queue.mutex:
             self.task_queue.queue.clear()
-        self.abort_current_flag.set()
-        self.player.stop_and_clear()
+        self.player.stop_immediate()
+        time.sleep(0.1)
+        self.stop_current_flag = False
 
-    def _sanitize_text(self, text: str) -> str:
-        text = self.re_ruby.sub(r'\2', text)
-        for word, yomi in Config.USER_DICT.items():
-            text = text.replace(word, yomi)
-        text = self.re_noise.sub('', text)
-        text = self.re_symbols.sub('', text)
-        text = self.re_url.sub('', text)
-        return text
+    def _clean_text(self, text):
+        user_dict = cfg.get("dictionary", {})
+        if user_dict:
+            for k, v in user_dict.items():
+                text = text.replace(k, v)
+
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        text = re.sub(r'http\S+', '', text)
+        text = re.sub(r'[#\*`>]', '', text)
+        text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
+        text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
+        text = re.sub(r'[一-龠々]+\s*[（\(]([ぁ-んァ-ン]+)[）\)]', r'\1', text)
+        
+        text = re.sub(r'[ \t]+', ' ', text)
+        
+        if cfg["require_hiragana"]:
+            if not re.search(r'[ぁ-ん]', text):
+                return None
+                
+        return text.strip()
 
     def _worker(self):
         while True:
-            text = self.task_queue.get()
-            self.abort_current_flag.clear()
-
-            clean_text = self._sanitize_text(text)
-            lines = [line.strip() for line in clean_text.splitlines() if line.strip()]
-
-            if lines:
-                print(f"🎤 合成開始: {len(lines)}行 (残りタスク: {self.task_queue.qsize()})")
-                all_segments = []
-                sample_rate = 44100
-
-                for i, line in enumerate(lines):
-                    if self.abort_current_flag.is_set():
-                        print("⛔ タスク中断")
-                        break
-
-                    print(f"  ├ 合成中 ({i+1}/{len(lines)}): {line[:15]}...")
-                    res = self.synth.synthesize_segment(line)
-                    if not res: continue
-                    data, sr = res
-                    sample_rate = sr
-
-                    self.player.enqueue(data, sr)
-                    all_segments.append(data)
-
-                    if Config.POST_PAUSE > 0 and i < len(lines) - 1:
-                        silence = np.zeros(int(sr * Config.POST_PAUSE), dtype=data.dtype)
-                        self.player.enqueue(silence, sr)
-                        all_segments.append(silence)
-
-                if not self.abort_current_flag.is_set() and all_segments:
-                    self.synth.save_merged(all_segments, text, sample_rate)
+            raw_text = self.task_queue.get()
+            self.stop_current_flag = False
             
+            cleaned_text = self._clean_text(raw_text)
+            
+            if not cleaned_text:
+                self.task_queue.task_done()
+                continue
+            
+            lines = [line.strip() for line in cleaned_text.splitlines() if line.strip()]
+            
+            total_len = sum(len(l) for l in lines)
+            if total_len < cfg["min_length"]:
+                self.task_queue.task_done()
+                continue
+
+            print(f"🎤 合成開始: {len(lines)}行 (Queue: {self.task_queue.qsize()})")
+            
+            audio_segments = []
+            sample_rate = 0
+            
+            for i, line in enumerate(lines):
+                if self.stop_current_flag:
+                    print("⛔ タスク中断")
+                    break
+                
+                print(f"  ├ 合成中 ({i+1}/{len(lines)}): {line[:20]}...")
+                
+                res = self.synth.synthesize(line)
+                if not res: continue
+                
+                data, sr = res
+                sample_rate = sr
+                
+                self.player.enqueue(data, sr)
+                audio_segments.append(data)
+
+            if audio_segments and not self.stop_current_flag:
+                full_audio = np.concatenate(audio_segments)
+                # save_log にはメタデータ生成用に「クリーニング済みの全文」を渡す
+                self.synth.save_log(full_audio, sample_rate, cleaned_text)
+
             self.task_queue.task_done()
 
-# ─── メインエントリーポイント ──────────────────────
-def main():
-    print("── AivisSpeech Reader v0.2.0 (Filter Enabled) ──")
-    print(f"📂 保存先: {Config.SAVE_DIR_ROOT}")
-    print(f"🎵 Artist: {Config.ARTIST_NAME}")
-    print(f"🛑 緊急停止: '{Config.STOP_COMMAND}'")
-    if Config.REQUIRE_HIRAGANA:
-        print("🛡️ 誤爆防止フィルター: 有効 (ひらがな必須)")
-    print("──────────────────────────────────────────")
-    
-    player = AudioPlayer()
-    synth = AivisSynthesizer(Config)
-    manager = TaskManager(synth, player)
+# ─── メインループ ──────────────────────────
+player = AudioPlayer()
+synth = AivisSynthesizer()
+manager = TaskManager(synth, player)
 
+def on_stop_hotkey():
+    manager.force_stop()
+
+def on_pause_hotkey():
+    player.toggle_pause()
+
+def setup_hotkeys():
+    try:
+        keyboard.add_hotkey(cfg["hotkeys"]["stop"], on_stop_hotkey)
+        keyboard.add_hotkey(cfg["hotkeys"]["pause"], on_pause_hotkey)
+    except: pass
+
+def main():
+    print(f"✨ AivisSpeech Clipboard Reader v{__version__} (Parallel Mode)")
+    
     if not synth.check_connection():
-        print("⚠️ エラー: AivisSpeech/VOICEVOXに接続できません。")
-        print("   アプリケーションが起動しているか、ポート番号(settings.py)を確認してください。")
+        print("❌ エラー: 音声サーバーに接続できません。起動確認とポート設定をお願いします。")
 
     try:
         last_text = pyperclip.paste()
         print("🔇 起動時のクリップボード内容はスキップします。")
     except:
         last_text = ""
+        
+    print(f"📋 監視中... (Min: {cfg['min_length']}文字)")
+    setup_hotkeys()
     
-    print("📋 クリップボード監視を開始します...")
+    stop_cmd = cfg.get("stop_command", ";;STOP")
 
     try:
         while True:
             try:
-                text = pyperclip.paste()
+                current_text = pyperclip.paste()
             except:
-                text = ""
+                current_text = ""
 
-            # ─── 誤爆防止フィルター ───
-            # 1. 短すぎるテキストの無視
-            if len(text) < Config.MIN_LENGTH:
-                # 短いテキストも履歴更新だけは行い、無限ループを防ぐ
-                if text != last_text:
-                    # print(f"ℹ️ スキップ: 文字数が短すぎます ({len(text)}文字)")
-                    last_text = text
-                time.sleep(Config.CHECK_INTERVAL)
-                continue
-
-            # 2. 日本語（ひらがな）チェック
-            if Config.REQUIRE_HIRAGANA and not re.search(r'[ぁ-ん]', text):
-                if text != last_text:
-                    # print("ℹ️ スキップ: ひらがなが含まれていません")
-                    last_text = text
-                time.sleep(Config.CHECK_INTERVAL)
-                continue
-            # ────────────────────────
-
-            if text and text != last_text and text.strip():
-                last_text = text
+            if current_text and current_text != last_text:
+                last_text = current_text
                 
-                if text.strip() == Config.STOP_COMMAND:
-                    manager.force_stop_all()
-                else:
-                    print(f"\n📝 新着検知: {len(text)}文字 -> キューに追加")
-                    manager.add_text(text)
+                if current_text.strip() == stop_cmd:
+                    on_stop_hotkey()
+                    continue
 
-            time.sleep(Config.CHECK_INTERVAL)
-
+                if current_text.strip():
+                     print(f"\n📝 新着検知")
+                     manager.add_text(current_text)
+            
+            time.sleep(0.5)
+            
     except KeyboardInterrupt:
-        print("\n👋 アプリケーションを終了します。")
-        manager.force_stop_all()
-        sys.exit()
+        print("\n👋 終了します")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

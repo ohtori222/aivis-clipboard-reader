@@ -6,148 +6,101 @@
 ## ✨ 特徴
 
 * **⚡ ストリーミング再生 & 順次キューイング**
-    * 合成処理と再生処理を並列化。長文でも待ち時間なく再生が始まります。
-    * 連続してテキストをコピーしても、自動的に「予約リスト（キュー）」に入り、順番に読み上げられます。
+  * コピーした順に自動で予約リスト（キュー）に入り、途切れることなく読み上げます。
 * **🧹 高度なテキストクリーニング**
-    * 読み上げに不要な Markdown記号（`#`, `*`, ` ``` ` 等）、URL、飾り文字を自動で除去します。
-    * ルビ（例：`漢（おとこ）`）を認識し、自動的に読み仮名のみを発音させる機能を搭載。
-* **📂 高機能なログ保存**
-    * 読み上げた音声は FLAC形式 で自動保存されます。
-    * ファイル名は「日付 + タイトル（2行目から抽出）」で自動生成され、視認性が抜群です。
-    * **日次フォルダ**（例: `251203/`）を自動作成し、大量のファイルもスッキリ整理されます。
-* **🎵 メタデータ & アートワーク埋め込み**
-    * FLACタグに「アーティスト名」「アルバム名（日付連動）」「トラック番号」を自動付与。
-    * 指定したジャケット画像（カバーアート）を埋め込むことができ、音楽プレイヤーでの見栄えが良くなります。
+  * Markdown記号（`#`, `*`等）、URL、ルビ（`漢（おとこ）`→`おとこ`）を自動で整形して読み上げます。
+* **⌨️ ホットキー操作**
+  * 他のウィンドウで作業中でも、キーボードショートカットで「一時停止」「緊急停止」が可能です。
+* **📂 リッチなログ保存 (FFmpeg連携)**
+  * **FFmpegインストール済みの場合**: 高圧縮な **Opus形式 (.ogg)** で保存し、カバー画像 (`cover.jpg`) を自動で埋め込みます。
+  * **FFmpegなしの場合**: **FLAC形式** で音声を保存します。
+  * 日次フォルダ（例: `251204/`）を作成し、ファイル名にタイトルを含めて自動整理します。
 
 ## 📦 必要要件
 
-* **OS:** Windows / macOS / Linux
+* **OS:** Windows (推奨) / macOS / Linux
 * **Python:** 3.8 以上
 * **音声合成エンジン:** 以下のいずれかがローカルで起動していること
-    * AivisSpeech (推奨/動作確認済み)
-    * VOICEVOX (VOICEVOX互換APIを使用しているため動作する見込みですが、作者による直接の動作確認は行っていません)
+  * AivisSpeech (推奨)
+  * VOICEVOX
+* **(推奨) FFmpeg:** インストールしてパスを通しておくと、Opus圧縮と画像埋め込み機能が有効になります。
 
 ## 🚀 インストール
 
-1.  **リポジトリのクローン**
-    ```bash
-    git clone https://github.com/あなたのユーザー名/aivis-clipboard-reader.git
-    cd aivis-clipboard-reader
-    ```
+1. **リポジトリのクローン**
+   ```bash
+   git clone [https://github.com/ohtori222/aivis-clipboard-reader.git](https://github.com/ohtori222/aivis-clipboard-reader.git)
+   cd aivis-clipboard-reader
+   ```
 
-2.  **依存ライブラリのインストール**
-    ```bash
-    # 仮想環境を作成
-    python -m venv .venv
+2. **依存ライブラリのインストール**
+   ```bash
+   # 仮想環境の作成と有効化 (Windows)
+   python -m venv .venv
+   .\.venv\Scripts\activate
 
-    # 仮想環境を有効化 (Windowsの場合)
-    .\.venv\Scripts\activate
+   # インストール
+   pip install -r requirements.txt
+   ```
 
-    # 仮想環境を有効化 (macOS/Linuxの場合)
-    source .venv/bin/activate
+3. **設定ファイルの準備**
+   `settings_template.py` は廃止されました。代わりに `config.json` を作成してください。
+   ```json
+   {
+     "speaker_id": 888753760,
+     "host": "127.0.0.1",
+     "port": 10101,
+     "hotkeys": {
+       "stop": "ctrl+alt+s",
+       "pause": "ctrl+alt+p"
+     }
+   }
+   ```
+   ※ その他の設定項目はソースコード内のデフォルト値が使われます。
 
-    # 依存ライブラリのインストール
-    pip install -r requirements.txt
-    ```
-
-3.  **設定ファイルの準備**
-    テンプレートをコピーして、設定ファイルを作成します。
-    ```bash
-    # Windows (PowerShell)の場合
-    Copy-Item settings_template.py settings.py
-    
-    # macOS / Linux の場合
-    cp settings_template.py settings.py
-    ```
-
-4.  **アートワークの準備（任意）**
-    スクリプトと同じフォルダに `cover.jpg` という名前で好きな画像を置いておくと、生成される音声ファイルに埋め込まれます。
-
-## ⚙️ 設定 (settings.py)
-
-### 🎙️ 話者IDの確認方法
-
-`settings.py` の **`SPEAKER_ID`** を設定するために、以下の補助スクリプトを実行してください。
-
-1.  **AivisSpeech/VOICEVOX を起動**します。
-2.  ターミナルで以下を実行します。
-    ```bash
-    python aivis_search_id.py
-    ```
-3.  出力されたリストから、使用したいキャラクターのIDをコピーし、`settings.py` の `SPEAKER_ID` に貼り付けてください。
-
-作成した `settings.py` をテキストエディタで開き、環境に合わせて編集してください。
-
-| 項目 | 説明 | デフォルト例 |
-| :--- | :--- | :--- |
-| **`SPEAKER_ID`** | 使用したいボイスのID（上記で確認） | `888753760` |
-| `ARTIST_NAME` | 音声ファイルのタグに記録されるアーティスト名 | `"MyAI"` |
-| `ALBUM_PREFIX` | アルバム名の接頭辞（`Log_251203`のようになります） | `"Log"` |
-| `DROPBOX_ROOT` | Dropboxフォルダのパス（自動検出しますが手動指定も可） | 自動検出 |
-| `USER_DICT` | 読み間違いを修正する単語辞書 | (コード内参照) |
+4. **アートワークの準備（任意）**
+   スクリプトと同じフォルダに `cover.jpg` を置くと、生成される音声ファイル(Ogg)に埋め込まれます。
 
 ## ▶️ 使い方
 
-アプリケーションの実行は、必ず仮想環境を有効化した状態で行ってください。
+1. AivisSpeech / VOICEVOX を起動します。
+2. スクリプトを実行します。
+   ```bash
+   python aivis_reader.py
+   ```
+3. 読み上げたいテキストを **コピー (Ctrl+C)** すると、自動で読み上げが始まります。
 
-1.  **仮想環境の有効化**
-    VS Codeを再起動したり、新しいターミナルを開いたりした際は、まず以下のコマンドで仮想環境を有効化してください。
+### ⌨️ 操作コマンド (ホットキー)
 
-    * **Windows (PowerShell)**:
-        ```bash
-        .\.venv\Scripts\activate
-        ```
+作業中でも以下のキーで操作可能です（`config.json` で変更可能）。
 
-    * **macOS / Linux**:
-        ```bash
-        source .venv/bin/activate
-        ```
+* **Ctrl + Alt + S**: **緊急停止** (再生を止め、予約キューを全て破棄します)
+* **Ctrl + Alt + P**: **一時停止 / 再開**
 
-2.  **AivisSpeech/VOICEVOX を起動**します。
+## ⚙️ 設定 (config.json)
 
-3.  **スクリプトを実行**します。
-    ```bash
-    python aivis_reader.py
-    ```
+プロジェクトルートに `config.json` を置くことで設定を変更できます。
 
-4.  読み上げさせたいテキストを **クリップボードにコピー（Ctrl+C）** してください。
+| キー | 説明 | デフォルト |
+| :--- | :--- | :--- |
+| `speaker_id` | 使用するボイスのID | `888753760` |
+| `output_dir` | 保存先フォルダ名 | `"Aivis_AudioLog"` |
+| `dropbox_dir` | Dropboxのルートパス (nullで自動検出) | `null` |
+| `speed` | 話速 | `1.0` |
+| `hotkeys` | 操作キー割り当て | (上記参照) |
 
-5.  コンソールに「📝 新着検知」と表示され、読み上げと保存が始まります。
+### 🔧 開発者向け: config.local.json
 
-### 🛑 緊急停止コマンド
-停止・終了方法は以下の2パターン存在します。
+`config.local.json` というファイルを作成すると、`config.json` の設定を上書きできます。
+このファイルは `.gitignore` に含まれているため、自分の環境専用のパスや設定を書いてもコミットされません。
 
-* **通常終了 (Graceful Shutdown):**
-    * ターミナル上で **`Ctrl` + `C`** (macOS の場合は **`Cmd` + `C`**) を押してください。プログラムが進行中のタスクを停止し、安全に終了します。
-
-* **緊急停止コマンド:**
-    * 読み上げ予約（キュー）をすべて破棄して、即座に停止したい場合は、以下の文字列をコピーしてください。
-    ```text
-    ;;STOP
-    ```
-    ※ このコマンド文字列は `settings.py` の `STOP_COMMAND` で変更可能です。
-
-## 📂 出力ファイル構成
-
-デフォルトでは、Dropboxフォルダ内の `Aivis_AudioLog` に保存されます。
-
-```text
-Dropbox/
-  └── Aivis_AudioLog/
-       ├── 251203/                <-- 日付フォルダ(YYMMDD)
-       │    ├── 2512031000_タイトルA.flac  (Track 1)
-       │    ├── 2512031005_タイトルB.flac  (Track 2)
-       │    └── ...
-       ├── 251204/
-       │    └── ...
+```json
+{
+  "dropbox_dir": "D:\\Personal\\Dropbox",
+  "volume": 0.8
+}
 ```
-## 📝 注意事項
-
-  * **起動時のスキップ機能:** アプリ起動時にクリップボードに残っていたテキストは、意図しない読み上げを防ぐためスキップされます。
-  * **音声が出ない場合:**
-      * AivisSpeech/VOICEVOXが起動しているか確認してください。
-      * `settings.py` の `HOST` と `PORT` が正しいか確認してください。
 
 ## 📜 License
 
-[MIT License](https://www.google.com/search?q=LICENSE)
+[MIT License](LICENSE)

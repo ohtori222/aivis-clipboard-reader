@@ -1,6 +1,7 @@
-pyperclip
 requests
+numpy
 sounddevice
 soundfile
-numpy
+pyperclip
+keyboard
 mutagen

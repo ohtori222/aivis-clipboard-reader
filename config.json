@@ -1,0 +1,67 @@
+{
+  "speaker_id": 888753760,
+  "host": "127.0.0.1",
+  "port": 10101,
+  "output_dir": "Aivis_AudioLog",
+  "dropbox_dir": null,
+  "artwork_path": "cover.jpg",
+  
+  "volume": 1.0,
+  "speed": 1.0,
+  "pitch": 0.0,
+  "intonation": 1.9,
+  "post_pause": 0.3,
+  
+  "min_length": 10,
+  "require_hiragana": true,
+  "stop_command": ";;STOP",
+  
+  "hotkeys": {
+    "stop": "ctrl+alt+s",
+    "pause": "ctrl+alt+p"
+  },
+  
+  "tags": {
+    "artist": "YourVoiceAssistant",
+    "album_prefix": "Log"
+  },
+  
+  "dictionary": {
+    "Gemini": "ジェミニ",
+    "ChatGPT": "チャットジーピーティー",
+    "Aivis": "アイビス",
+    "Google": "グーグル",
+    "YouTube": "ユーチューブ",
+    "Amazon": "アマゾン",
+    "NG": "エヌジー",
+    "OK": "オーケー",
+    "GW": "ゴールデンウィーク",
+    "MTG": "ミーティング",
+    "PJ": "プロジェクト",
+    "KPI": "ケーピーアイ",
+    "Q&A": "キューアンドエー",
+    "vs": "バーサス",
+    "ver.": "バージョン",
+    "vol.": "ボリューム",
+    "No.": "ナンバー",
+    "ID": "アイディー",
+    "cm": "センチ",
+    "mm": "ミリ",
+    "kg": "キロ",
+    "km": "キロ",
+    "fps": "エフピーエス",
+    "Hz": "ヘルツ",
+    "＆": "アンド",
+    "&": "アンド",
+    "％": "パーセント",
+    "＋": "プラス",
+    ".exe": "エグゼ",
+    ".jpg": "ジェイペグ",
+    ".png": "ピング",
+    ".pdf": "ピーディーエフ",
+    ".txt": "テキスト",
+    ".zip": "ジップ",
+    "日付": "ひづけ",
+    "分間": "ふんかん"
+  }
+}

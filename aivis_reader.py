@@ -14,17 +14,29 @@ import soundfile as sf
 import pyperclip
 import keyboard
 
+# ★機能追加: FFmpeg連携・タグ付け用
+import shutil
+import subprocess
+import base64
+
 # FLACタグ編集用 (あれば使う)
 try:
     from mutagen.flac import FLAC, Picture
     from mutagen.id3 import PictureType
 
+    # ★機能追加: Opus/FLAC両対応のため汎用Fileクラスをインポート
+    from mutagen import File as MutagenFile
+
     HAS_MUTAGEN = True
 except ImportError:
     HAS_MUTAGEN = False
 
+# ★機能追加: FFmpeg検出 (あればOpusエンコードに使用)
+FFMPEG_PATH = shutil.which("ffmpeg")
+HAS_FFMPEG = FFMPEG_PATH is not None
+
 # ★バージョン情報
-__version__ = "0.4.7"
+__version__ = "0.5.0"
 
 # === グローバル変数・状態管理 ===
 play_queue = queue.Queue()
@@ -197,6 +209,10 @@ class AivisSynthesizer:
     def save_log(self, full_audio, sr, original_text):
         """FLACで保存し、mutagenでタグ付けを行う"""
 
+        # ★機能追加: 保存形式の決定 (FFmpegがあればOpus優先)
+        use_opus = HAS_FFMPEG
+        target_ext = ".opus" if use_opus else ".flac"
+
         root_path = cfg["dropbox_dir"]
         if not root_path:
             possible = [
@@ -215,8 +231,11 @@ class AivisSynthesizer:
         os.makedirs(daily_save_dir, exist_ok=True)
 
         try:
+            # ★修正: .opusも検索対象に含める
             existing_files = [
-                f for f in os.listdir(daily_save_dir) if f.endswith((".flac", ".ogg"))
+                f
+                for f in os.listdir(daily_save_dir)
+                if f.endswith((".flac", ".ogg", ".opus"))
             ]
             track_number = len(existing_files) + 1
         # ★不具合修正: 例外処理を具体化し、エラーを出力
@@ -236,43 +255,113 @@ class AivisSynthesizer:
         clean_title = re.sub(r"[^\w]", "", sentence_part)[:20] or "NoTitle"
 
         timestamp = datetime.datetime.now().strftime("%y%m%d%H%M%S")
-        filename = f"{timestamp}_{clean_title}.flac"
+        # ★修正: 拡張子を動的に変更
+        filename = f"{timestamp}_{clean_title}{target_ext}"
         filepath = os.path.join(daily_save_dir, filename)
 
         try:
-            # Windows日本語パス対策のため open() で書き込み
-            with open(filepath, "wb") as f:
-                sf.write(f, full_audio, sr, format="FLAC")
+            # ★機能追加: 保存処理の分岐
+            if use_opus:
+                # --- FFmpeg Opus保存処理 ---
+                # 入力データ準備 (Float32 Little Endian)。soundfileの出力はint16やfloat64の可能性があるため変換。
+                if full_audio.dtype != np.float32:
+                    audio_input = full_audio.astype(np.float32)
+                else:
+                    audio_input = full_audio
+
+                channels = 1 if audio_input.ndim == 1 else audio_input.shape[1]
+
+                command = [
+                    FFMPEG_PATH,
+                    "-f",
+                    "f32le",  # 入力形式
+                    "-ar",
+                    str(sr),  # サンプリングレート
+                    "-ac",
+                    str(channels),  # チャンネル数
+                    "-i",
+                    "pipe:0",  # 標準入力から読み込む
+                    "-c:a",
+                    "libopus",  # コーデック
+                    "-b:a",
+                    "128k",  # ビットレート指定
+                    "-vbr",
+                    "on",
+                    "-y",  # 上書き確認なし
+                    filepath,
+                ]
+
+                process = subprocess.Popen(
+                    command,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,  # 標準出力は捨てる
+                    stderr=subprocess.PIPE,  # エラー出力を取得
+                )
+                _, stderr = process.communicate(input=audio_input.tobytes())
+
+                if process.returncode != 0:
+                    err_msg = stderr.decode("utf-8", errors="ignore")
+                    print(f"⚠️ FFmpegエラー詳細: {err_msg}")
+                    raise Exception(f"FFmpeg failed (Code: {process.returncode})")
+                # --- FFmpeg保存処理終了 ---
+            else:
+                # Windows日本語パス対策のため open() で書き込み (既存ロジック)
+                with open(filepath, "wb") as f:
+                    sf.write(f, full_audio, sr, format="FLAC")
 
             if HAS_MUTAGEN:
-                audio = FLAC(filepath)
+                # ★修正: FLAC決め打ちから汎用Fileクラスへ変更
+                audio = MutagenFile(filepath)
 
-                current_date_str = datetime.datetime.now().strftime("%y%m%d")
+                # ★機能追加: ファイル形式が認識できない場合のエラーハンドリング
+                if audio is None:
+                    print(
+                        f"⚠️ タグ付け失敗: mutagenがファイル形式を認識できませんでした。"
+                    )
+                else:
+                    current_date_str = datetime.datetime.now().strftime("%y%m%d")
 
-                # ★メタタイトルを使用
-                audio["title"] = meta_title
-                audio["artist"] = cfg["tags"]["artist"]
-                audio["album"] = f"{cfg['tags']['album_prefix']}_{current_date_str}"
-                audio["tracknumber"] = str(track_number)
+                    # ★メタタイトルを使用
+                    audio["title"] = meta_title
+                    audio["artist"] = cfg["tags"]["artist"]
+                    audio["album"] = f"{cfg['tags']['album_prefix']}_{current_date_str}"
+                    audio["tracknumber"] = str(track_number)
 
-                artwork = cfg["artwork_path"]
-                if os.path.exists(artwork):
-                    image = Picture()
-                    image.type = PictureType.COVER_FRONT
-                    if artwork.lower().endswith((".jpg", ".jpeg")):
-                        image.mime = "image/jpeg"
-                    else:
-                        image.mime = "image/png"
-                    with open(artwork, "rb") as f:
-                        image.data = f.read()
-                    audio.add_picture(image)
+                    artwork = cfg["artwork_path"]
+                    if os.path.exists(artwork):
+                        image = Picture()
+                        image.type = PictureType.COVER_FRONT
+                        if artwork.lower().endswith((".jpg", ".jpeg")):
+                            image.mime = "image/jpeg"
+                        else:
+                            image.mime = "image/png"
+                        with open(artwork, "rb") as f:
+                            image.data = f.read()
 
-                audio.save()
+                        # ★機能追加: アートワーク埋め込み方法の分岐
+                        if use_opus:
+                            # Opus (Vorbis Comment): METADATA_BLOCK_PICTUREタグにBase64で設定
+                            # image.write() はFLAC Pictureブロック構造のバイト列を返す
+                            encoded_data = base64.b64encode(image.write()).decode(
+                                "ascii"
+                            )
+                            audio["METADATA_BLOCK_PICTURE"] = [encoded_data]
+                        else:
+                            # FLAC (既存ロジック)
+                            audio.add_picture(image)
+
+                    audio.save()
 
             print(f"💾 [保存完了] {daily_date_str}/ No.{track_number} - {filename}")
 
         except Exception as e:
             print(f"⚠️ 保存失敗: {e}")
+            # ★機能追加: FFmpeg失敗時などにエンコード途中のファイルが残っていれば削除
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
 
 
 # ─── TaskManager クラス ──────────────────────────
@@ -310,6 +399,8 @@ class TaskManager:
 
         text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
         text = re.sub(r"http\S+", "", text)
+        # ★追加: 2回以上連続するハイフン(-)や等号(=)を削除（区切り線対策）
+        text = re.sub(r"[-=]{2,}", "", text)
         text = re.sub(r"[#\*`>]", "", text)
         text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
         text = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)
@@ -394,7 +485,11 @@ def setup_hotkeys():
 
 
 def main():
-    print(f"✨ AivisSpeech Clipboard Reader v{__version__} (Parallel Mode)")
+    print(f"✨ AivisSpeech Clipboard Reader v{__version__}")
+
+    # ★機能追加: FFmpeg検出通知
+    if HAS_FFMPEG:
+        print(f"🔧 FFmpeg検出: Opus形式での保存を有効化します。")
 
     if not synth.check_connection():
         print(

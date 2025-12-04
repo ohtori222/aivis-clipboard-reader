@@ -12,7 +12,7 @@
 * **⌨️ ホットキー操作**
   * 他のウィンドウで作業中でも、キーボードショートカットで「一時停止」「緊急停止」が可能です。
 * **📂 リッチなログ保存 (FFmpeg連携)**
-  * **FFmpegインストール済みの場合**: 高圧縮な **Opus形式 (.ogg)** で保存し、カバー画像 (`cover.jpg`) を自動で埋め込みます。
+  * **FFmpegインストール済みの場合**: 高圧縮な **Opus形式 (.opus)** で保存し、カバー画像 (`cover.jpg`) を自動で埋め込みます。
   * **FFmpegなしの場合**: **FLAC形式** で音声を保存します。
   * 日次フォルダ（例: `251204/`）を作成し、ファイル名にタイトルを含めて自動整理します。
 
@@ -33,49 +33,52 @@
    cd aivis-clipboard-reader
    ```
 
-2. **依存ライブラリのインストール**
-   ```bash
-   # 仮想環境の作成と有効化 (Windows)
-   python -m venv .venv
-   .\.venv\Scripts\activate
+2.  **依存ライブラリのインストール**
 
-   # インストール
-   pip install -r requirements.txt
-   ```
+    ```bash
+    # 仮想環境の作成と有効化 (Windows)
+    python -m venv .venv
+    .\.venv\Scripts\activate
 
-3. **設定ファイルの準備**
-   `settings_template.py` は廃止されました。代わりに `config.json` を作成してください。
-   ```json
-   {
-     "speaker_id": 888753760,
-     "host": "127.0.0.1",
-     "port": 10101,
-     "hotkeys": {
-       "stop": "ctrl+alt+s",
-       "pause": "ctrl+alt+p"
-     }
-   }
-   ```
-   ※ その他の設定項目はソースコード内のデフォルト値が使われます。
+    # インストール
+    pip install -r requirements.txt
+    ```
 
-4. **アートワークの準備（任意）**
-   スクリプトと同じフォルダに `cover.jpg` を置くと、生成される音声ファイル(Ogg)に埋め込まれます。
+3.  **設定ファイルの準備**
+    `settings_template.py` は廃止されました。代わりに `config.json` を作成してください。
+
+    ```json
+    {
+      "speaker_id": 888753760,
+      "host": "127.0.0.1",
+      "port": 10101,
+      "hotkeys": {
+        "stop": "ctrl+alt+s",
+        "pause": "ctrl+alt+p"
+      }
+    }
+    ```
+
+    ※ その他の設定項目はソースコード内のデフォルト値が使われます。
+
+4.  **アートワークの準備（任意）**
+    スクリプトと同じフォルダに `cover.jpg` (または `cover.png`) を置くと、生成される音声ファイルに埋め込まれます。
 
 ## ▶️ 使い方
 
-1. AivisSpeech / VOICEVOX を起動します。
-2. スクリプトを実行します。
-   ```bash
-   python aivis_reader.py
-   ```
-3. 読み上げたいテキストを **コピー (Ctrl+C)** すると、自動で読み上げが始まります。
+1.  AivisSpeech / VOICEVOX を起動します。
+2.  スクリプトを実行します。
+    ```bash
+    python aivis_reader.py
+    ```
+3.  読み上げたいテキストを **コピー (Ctrl+C)** すると、自動で読み上げが始まります。
 
 ### ⌨️ 操作コマンド (ホットキー)
 
 作業中でも以下のキーで操作可能です（`config.json` で変更可能）。
 
-* **Ctrl + Alt + S**: **緊急停止** (再生を止め、予約キューを全て破棄します)
-* **Ctrl + Alt + P**: **一時停止 / 再開**
+  * **Ctrl + Alt + S**: **緊急停止** (再生を止め、予約キューを全て破棄します)
+  * **Ctrl + Alt + P**: **一時停止 / 再開**
 
 ## ⚙️ 設定 (config.json)
 

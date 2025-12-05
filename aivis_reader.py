@@ -33,7 +33,7 @@ FFMPEG_PATH = shutil.which("ffmpeg")
 HAS_FFMPEG = FFMPEG_PATH is not None
 
 # バージョン情報
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 # === グローバル変数・状態管理 ===
 play_queue = queue.Queue()
@@ -110,51 +110,123 @@ class ConfigManager:
 cfg = ConfigManager()
 
 
-# ─── プレーヤー (消費者スレッド) ────────────────
+# ─── プレーヤー (ストリーム再生・常時接続版) ────────────────
 class AudioPlayer:
     def __init__(self):
         self.queue = queue.Queue()
         self.stop_flag = threading.Event()
         self.is_paused = False
+        # ストリーム管理用
+        self.stream = None
+        self.current_sr = None
+
         self.thread = threading.Thread(target=self._worker, daemon=True)
         self.thread.start()
 
     def _worker(self):
+        # アイドル時に流す無音チャンク（0.1秒分）
+        # ※サンプリングレートが決まるまでは作れないのでループ内で生成
+        silence_chunk = None
+
         while True:
+            # 1. 停止フラグがあればキューを空にする
             if self.stop_flag.is_set():
                 with self.queue.mutex:
                     self.queue.queue.clear()
                 self.stop_flag.clear()
+                # ストリームは閉じずに、無音を流して待機するのが理想だが
+                # 強制停止時はバッファのリセットが必要なため、一度作り直す手もある。
+                # ここでは簡易的に「読み飛ばし」のみ行う。
 
-            item = self.queue.get()
-            if item is None:
-                self.queue.task_done()
-                continue
-            data, sr = item
-
-            while self.is_paused:
-                if self.stop_flag.is_set():
-                    break
-                time.sleep(0.1)
-
+            # 2. キューからデータを取得（ノンブロッキングでトライ）
             try:
-                if not self.stop_flag.is_set():
-                    sd.play(data, sr)
-                    sd.wait()
-            except Exception as e:
-                print(f"⚠️ 再生エラー: {e}")
-            finally:
-                self.queue.task_done()
+                # 0.05秒だけ待ってみる。データがなければEmpty例外へ
+                item = self.queue.get(timeout=0.05)
+            except queue.Empty:
+                item = None
+
+            # 3. データがある場合の処理
+            if item is not None:
+                data, sr = item
+
+                # ストリームの初期化 or サンプリングレート変更時の再作成
+                if self.stream is None or self.current_sr != sr:
+                    if self.stream is not None:
+                        self.stream.stop()
+                        self.stream.close()
+
+                    self.current_sr = sr
+                    # ブロックサイズ等は自動。チャンネルはデータの形状から判断
+                    channels = 1 if data.ndim == 1 else data.shape[1]
+
+                    try:
+                        self.stream = sd.OutputStream(
+                            samplerate=sr,
+                            channels=channels,
+                            dtype="float32",  # float32で統一
+                        )
+                        self.stream.start()
+                        # 無音チャンクもこのSRに合わせて作り直す
+                        silence_chunk = np.zeros(
+                            (int(sr * 0.1), channels), dtype=np.float32
+                        )
+                        if channels == 1:
+                            silence_chunk = silence_chunk.flatten()
+
+                        print(f"🔊 ストリーム開始: {sr}Hz / {channels}ch")
+                    except Exception as e:
+                        print(f"⚠️ ストリーム初期化エラー: {e}")
+                        self.queue.task_done()
+                        continue
+
+                # 再生（書き込み）
+                # ※ is_paused のチェックは「書き込み直前」に行う
+                try:
+                    # ストリームに書き込む（ブロックする可能性があるため、停止フラグも監視したいが簡易実装）
+                    # 一時停止中はループで無音を書き込みながら待機
+                    while self.is_paused:
+                        if self.stop_flag.is_set():
+                            break  # 停止命令が来たらループ抜ける
+                        self.stream.write(silence_chunk)
+
+                    if not self.stop_flag.is_set():
+                        self.stream.write(data)
+
+                except Exception as e:
+                    print(f"⚠️ 再生書き込みエラー: {e}")
+                finally:
+                    self.queue.task_done()
+
+            # 4. データがない（アイドル中）の場合
+            else:
+                # ストリームが開いているなら、無音を流してDACを起こしておく
+                if self.stream is not None and self.stream.active:
+                    try:
+                        self.stream.write(silence_chunk)
+                    except Exception:
+                        pass
+                else:
+                    # ストリームがまだ一度も開いてないなら何もしない
+                    pass
 
     def enqueue(self, data, sr):
         self.queue.put((data, sr))
 
     def stop_immediate(self):
         self.stop_flag.set()
-        sd.stop()
+        # ストリームを停止・破棄するとそこで「プチッ」となるので、
+        # ここではフラグを立ててキューを空にするだけにする。
+        # _worker側で次のデータ書き込みをスキップさせる。
+
+        # ただし、現在再生中の音を即座に消したい場合は、
+        # stream.stop() を呼ぶ必要があるが、ノイズの原因になる。
+        # ノイズ対策なら「無音を流し続ける」のが正解なので、
+        # stop() は呼ばずにキューのクリアのみで対応する。
         with self.queue.mutex:
             self.queue.queue.clear()
-        self.queue.put(None)
+
+        # Workerが sleep などを抜けられるようにダミーを入れる手もあるが、
+        # 今回は timeout=0.05 なので即反応するはず。
 
     def toggle_pause(self):
         self.is_paused = not self.is_paused
@@ -198,22 +270,22 @@ class AivisSynthesizer:
             )
             w_res.raise_for_status()
 
-            # ★変更・追加: ここでデータを読み込み、フェード処理を加える
-            data, sr = sf.read(io.BytesIO(w_res.content))
+            # ★変更: float32は音質が良いので維持
+            data, sr = sf.read(io.BytesIO(w_res.content), dtype="float32")
 
-            # --- クリックノイズ対策 (Fade In/Out) ---
-            # 冒頭と末尾の10ms(0.01秒)を滑らかにする
-            fade_duration = 0.01
+            # --- クリックノイズ対策 ---
+            # フェード時間は 30ms (0.03秒) に設定。
+            fade_duration = 0.03
             fade_len = int(sr * fade_duration)
 
-            # データ長がフェード処理分より長い場合のみ適用
             if len(data) > fade_len * 2:
-                # フェードイン (0.0 -> 1.0)
-                fade_in_curve = np.linspace(0.0, 1.0, fade_len)
-                if data.ndim == 1:  # モノラル
+                # float32精度で滑らかにフェード
+                fade_in_curve = np.linspace(0.0, 1.0, fade_len, dtype=np.float32)
+
+                if data.ndim == 1:
                     data[:fade_len] *= fade_in_curve
                     data[-fade_len:] *= fade_in_curve[::-1]
-                else:  # ステレオ等の場合 (念のため対応)
+                else:
                     data[:fade_len] *= fade_in_curve[:, np.newaxis]
                     data[-fade_len:] *= fade_in_curve[::-1][:, np.newaxis]
             # ---------------------------------------

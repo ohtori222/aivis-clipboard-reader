@@ -32,7 +32,7 @@ FFMPEG_PATH = shutil.which("ffmpeg")
 HAS_FFMPEG = FFMPEG_PATH is not None
 
 # バージョン情報
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 # === グローバル変数・状態管理 ===
 play_queue = queue.Queue()
@@ -196,7 +196,28 @@ class AivisSynthesizer:
             )
             w_res.raise_for_status()
 
-            return sf.read(io.BytesIO(w_res.content))
+            # ★変更・追加: ここでデータを読み込み、フェード処理を加える
+            data, sr = sf.read(io.BytesIO(w_res.content))
+
+            # --- クリックノイズ対策 (Fade In/Out) ---
+            # 冒頭と末尾の10ms(0.01秒)を滑らかにする
+            fade_duration = 0.01
+            fade_len = int(sr * fade_duration)
+
+            # データ長がフェード処理分より長い場合のみ適用
+            if len(data) > fade_len * 2:
+                # フェードイン (0.0 -> 1.0)
+                fade_in_curve = np.linspace(0.0, 1.0, fade_len)
+                if data.ndim == 1:  # モノラル
+                    data[:fade_len] *= fade_in_curve
+                    data[-fade_len:] *= fade_in_curve[::-1]
+                else:  # ステレオ等の場合 (念のため対応)
+                    data[:fade_len] *= fade_in_curve[:, np.newaxis]
+                    data[-fade_len:] *= fade_in_curve[::-1][:, np.newaxis]
+            # ---------------------------------------
+
+            return data, sr
+
         except Exception as e:
             print(f"❌ APIエラー: {e}")
             return None

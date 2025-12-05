@@ -16,6 +16,7 @@ import keyboard
 import shutil
 import subprocess
 import base64
+import argparse  # ★追加: 引数解析用
 
 # FLACタグ編集用 (あれば使う)
 try:
@@ -32,7 +33,7 @@ FFMPEG_PATH = shutil.which("ffmpeg")
 HAS_FFMPEG = FFMPEG_PATH is not None
 
 # バージョン情報
-__version__ = "0.5.2"
+__version__ = "0.5.3"
 
 # === グローバル変数・状態管理 ===
 play_queue = queue.Queue()
@@ -164,6 +165,7 @@ class AudioPlayer:
 class AivisSynthesizer:
     def __init__(self):
         self.base_url = f"http://{cfg['host']}:{cfg['port']}"
+        self.force_flac = False  # ★追加: FLAC強制フラグ
 
     def check_connection(self):
         try:
@@ -225,7 +227,8 @@ class AivisSynthesizer:
     def save_log(self, full_audio, sr, original_text):
         """FLAC/Opusで保存し、mutagenでタグ付けを行う"""
 
-        use_opus = HAS_FFMPEG
+        # ★変更: 引数でFLAC強制が指定されている場合は、Opusを使わない
+        use_opus = HAS_FFMPEG and not self.force_flac
         target_ext = ".opus" if use_opus else ".flac"
 
         root_path = cfg["dropbox_dir"]
@@ -477,10 +480,30 @@ def setup_hotkeys():
 
 
 def main():
+    # ★追加: コマンドライン引数解析 (-f と --flac 両対応)
+    parser = argparse.ArgumentParser(description="AivisSpeech Clipboard Reader")
+    parser.add_argument(
+        "-f",
+        "--flac",
+        action="store_true",
+        help="強制的にFLAC形式で保存します (FFmpegがある場合でも)",
+    )
+    args = parser.parse_args()
+
+    # オプションが指定された場合、synthの設定を更新
+    if args.flac:
+        synth.force_flac = True
+        print("🔧 オプション指定: 強制的にFLACで保存します。")
+
     print(f"✨ AivisSpeech Clipboard Reader v{__version__}")
 
     if HAS_FFMPEG:
-        print("🔧 FFmpeg検出: Opus形式での保存を有効化します。")
+        if args.flac:
+            print("🔧 FFmpeg検出済みですが、--flac(-f)によりFLAC保存を行います。")
+        else:
+            print("🔧 FFmpeg検出: Opus形式での保存を有効化します。")
+    else:
+        print("ℹ️ FFmpeg未検出: FLAC形式で保存します。")
 
     if not synth.check_connection():
         print(

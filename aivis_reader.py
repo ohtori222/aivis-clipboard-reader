@@ -33,14 +33,7 @@ FFMPEG_PATH = shutil.which("ffmpeg")
 HAS_FFMPEG = FFMPEG_PATH is not None
 
 # バージョン情報
-__version__ = "0.5.5"
-
-# === グローバル変数・状態管理 ===
-play_queue = queue.Queue()
-stop_event = threading.Event()
-is_paused = False
-config = {}
-
+__version__ = "0.5.6"
 
 # ─── 設定管理クラス ────────────────────────
 class ConfigManager:

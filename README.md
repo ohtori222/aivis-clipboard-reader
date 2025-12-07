@@ -73,6 +73,17 @@
     ```
 3.  読み上げたいテキストを **コピー (Ctrl+C)** すると、自動で読み上げが始まります。
 
+### ⌨️ コマンドライン引数 (オプション)
+
+```bash
+# 日付を指定して起動 (過去ログの整理などに便利)
+# 保存先のフォルダ名とファイル名の日付部分が指定した値になります
+python aivis_reader.py --date 251206
+
+# 強制的にFLACで保存 (FFmpeg導入環境でもOpusを使わない場合)
+python aivis_reader.py --flac
+```
+
 ### ⌨️ 操作コマンド (ホットキー)
 
 作業中でも以下のキーで操作可能です（`config.json` で変更可能）。
@@ -90,6 +101,7 @@
 | `output_dir` | 保存先フォルダ名 | `"Aivis_AudioLog"` |
 | `dropbox_dir` | Dropboxのルートパス (nullで自動検出) | `null` |
 | `speed` | 話速 | `1.0` |
+| `force_flac` | FFmpegがあってもOpusを使わずFLACで保存するか | `false` |
 | `hotkeys` | 操作キー割り当て | (上記参照) |
 
 ### 🔧 開発者向け: config.local.json

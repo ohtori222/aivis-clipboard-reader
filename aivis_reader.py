@@ -33,7 +33,7 @@ FFMPEG_PATH = shutil.which("ffmpeg")
 HAS_FFMPEG = FFMPEG_PATH is not None
 
 # バージョン情報
-__version__ = "0.5.4"
+__version__ = "0.5.5"
 
 # === グローバル変数・状態管理 ===
 play_queue = queue.Queue()
@@ -59,13 +59,12 @@ class ConfigManager:
         "min_length": 10,
         "require_hiragana": True,
         "stop_command": ";;STOP",
-        # ★変更: 設定をフラット化 (hotkeys廃止)
         "hotkey_stop": "ctrl+alt+s",
         "hotkey_pause": "ctrl+alt+p",
-        # ★変更: 設定をフラット化 (tags廃止)
         "artist": "AivisReader",
         "album_prefix": "Log",
         "dictionary": {},
+        "force_flac": False,  # ★追加: デフォルト設定
     }
 
     def __init__(self):
@@ -105,6 +104,9 @@ class ConfigManager:
     def __getitem__(self, key):
         return self.data[key]
 
+    def __setitem__(self, key, value):
+        self.data[key] = value
+
 
 # グローバル設定インスタンス
 cfg = ConfigManager()
@@ -125,7 +127,6 @@ class AudioPlayer:
 
     def _worker(self):
         # アイドル時に流す無音チャンク（0.1秒分）
-        # ※サンプリングレートが決まるまでは作れないのでループ内で生成
         silence_chunk = None
 
         while True:
@@ -134,13 +135,9 @@ class AudioPlayer:
                 with self.queue.mutex:
                     self.queue.queue.clear()
                 self.stop_flag.clear()
-                # ストリームは閉じずに、無音を流して待機するのが理想だが
-                # 強制停止時はバッファのリセットが必要なため、一度作り直す手もある。
-                # ここでは簡易的に「読み飛ばし」のみ行う。
 
-            # 2. キューからデータを取得（ノンブロッキングでトライ）
+            # 2. キューからデータを取得
             try:
-                # 0.05秒だけ待ってみる。データがなければEmpty例外へ
                 item = self.queue.get(timeout=0.05)
             except queue.Empty:
                 item = None
@@ -156,14 +153,13 @@ class AudioPlayer:
                         self.stream.close()
 
                     self.current_sr = sr
-                    # ブロックサイズ等は自動。チャンネルはデータの形状から判断
                     channels = 1 if data.ndim == 1 else data.shape[1]
 
                     try:
                         self.stream = sd.OutputStream(
                             samplerate=sr,
                             channels=channels,
-                            dtype="float32",  # float32で統一
+                            dtype="float32",
                         )
                         self.stream.start()
                         # 無音チャンクもこのSRに合わせて作り直す
@@ -180,13 +176,10 @@ class AudioPlayer:
                         continue
 
                 # 再生（書き込み）
-                # ※ is_paused のチェックは「書き込み直前」に行う
                 try:
-                    # ストリームに書き込む（ブロックする可能性があるため、停止フラグも監視したいが簡易実装）
-                    # 一時停止中はループで無音を書き込みながら待機
                     while self.is_paused:
                         if self.stop_flag.is_set():
-                            break  # 停止命令が来たらループ抜ける
+                            break
                         self.stream.write(silence_chunk)
 
                     if not self.stop_flag.is_set():
@@ -199,14 +192,12 @@ class AudioPlayer:
 
             # 4. データがない（アイドル中）の場合
             else:
-                # ストリームが開いているなら、無音を流してDACを起こしておく
                 if self.stream is not None and self.stream.active:
                     try:
                         self.stream.write(silence_chunk)
                     except Exception:
                         pass
                 else:
-                    # ストリームがまだ一度も開いてないなら何もしない
                     pass
 
     def enqueue(self, data, sr):
@@ -214,19 +205,8 @@ class AudioPlayer:
 
     def stop_immediate(self):
         self.stop_flag.set()
-        # ストリームを停止・破棄するとそこで「プチッ」となるので、
-        # ここではフラグを立ててキューを空にするだけにする。
-        # _worker側で次のデータ書き込みをスキップさせる。
-
-        # ただし、現在再生中の音を即座に消したい場合は、
-        # stream.stop() を呼ぶ必要があるが、ノイズの原因になる。
-        # ノイズ対策なら「無音を流し続ける」のが正解なので、
-        # stop() は呼ばずにキューのクリアのみで対応する。
         with self.queue.mutex:
             self.queue.queue.clear()
-
-        # Workerが sleep などを抜けられるようにダミーを入れる手もあるが、
-        # 今回は timeout=0.05 なので即反応するはず。
 
     def toggle_pause(self):
         self.is_paused = not self.is_paused
@@ -237,7 +217,7 @@ class AudioPlayer:
 class AivisSynthesizer:
     def __init__(self):
         self.base_url = f"http://{cfg['host']}:{cfg['port']}"
-        self.force_flac = False  # ★追加: FLAC強制フラグ
+        self.force_flac = False  # デフォルトはFalseだが、main()で上書きされる可能性あり
 
     def check_connection(self):
         try:
@@ -270,16 +250,13 @@ class AivisSynthesizer:
             )
             w_res.raise_for_status()
 
-            # ★変更: float32は音質が良いので維持
             data, sr = sf.read(io.BytesIO(w_res.content), dtype="float32")
 
-            # --- クリックノイズ対策 ---
-            # フェード時間は 30ms (0.03秒) に設定。
+            # --- クリックノイズ対策 (フェード処理) ---
             fade_duration = 0.03
             fade_len = int(sr * fade_duration)
 
             if len(data) > fade_len * 2:
-                # float32精度で滑らかにフェード
                 fade_in_curve = np.linspace(0.0, 1.0, fade_len, dtype=np.float32)
 
                 if data.ndim == 1:
@@ -299,7 +276,7 @@ class AivisSynthesizer:
     def save_log(self, full_audio, sr, original_text):
         """FLAC/Opusで保存し、mutagenでタグ付けを行う"""
 
-        # ★変更: 引数でFLAC強制が指定されている場合は、Opusを使わない
+        # ★変更: 引数 or 設定でFLAC強制が指定されている場合は、Opusを使わない
         use_opus = HAS_FFMPEG and not self.force_flac
         target_ext = ".opus" if use_opus else ".flac"
 
@@ -316,7 +293,13 @@ class AivisSynthesizer:
         if not root_path:
             root_path = os.getcwd()
 
-        daily_date_str = datetime.datetime.now().strftime("%y%m%d")
+        # ★日付オーバーライド確認
+        override_date = cfg.get("override_date")
+        if override_date:
+            daily_date_str = override_date
+        else:
+            daily_date_str = datetime.datetime.now().strftime("%y%m%d")
+
         daily_save_dir = os.path.join(root_path, cfg["output_dir"], daily_date_str)
         os.makedirs(daily_save_dir, exist_ok=True)
 
@@ -335,7 +318,13 @@ class AivisSynthesizer:
         sentence_part = original_text.split("。")[0]
         clean_title = re.sub(r"[^\w]", "", sentence_part)[:20] or "NoTitle"
 
-        timestamp = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+        if override_date:
+            # 時刻だけ現在のものを使う
+            current_time_str = datetime.datetime.now().strftime("%H%M%S")
+            timestamp = f"{override_date}{current_time_str}"
+        else:
+            timestamp = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+
         filename = f"{timestamp}_{clean_title}{target_ext}"
         filepath = os.path.join(daily_save_dir, filename)
 
@@ -393,9 +382,12 @@ class AivisSynthesizer:
                         "⚠️ タグ付け失敗: mutagenがファイル形式を認識できませんでした。"
                     )
                 else:
-                    current_date_str = datetime.datetime.now().strftime("%y%m%d")
+                    if override_date:
+                        current_date_str = override_date
+                    else:
+                        current_date_str = datetime.datetime.now().strftime("%y%m%d")
 
-                    # ★変更: フラット化された設定値を使用
+
                     audio["title"] = meta_title
                     audio["artist"] = cfg["artist"]
                     audio["album"] = f"{cfg['album_prefix']}_{current_date_str}"
@@ -404,18 +396,24 @@ class AivisSynthesizer:
                     artwork = cfg["artwork_path"]
                     if os.path.exists(artwork):
                         image = Picture()
-                        image.type = PictureType.COVER_FRONT
+                        # ★修正: Enumではなく整数値(3=Cover Front)を明示的に設定
+                        image.type = 3
+                        # ★修正: Descriptionを明示 (一部プレーヤー対策)
+                        image.desc = "Cover"
+
                         if artwork.lower().endswith((".jpg", ".jpeg")):
                             image.mime = "image/jpeg"
                         else:
                             image.mime = "image/png"
+
                         with open(artwork, "rb") as f:
                             image.data = f.read()
 
                         if use_opus:
-                            encoded_data = base64.b64encode(image.write()).decode(
-                                "ascii"
-                            )
+                            # Opus (Ogg) の場合は METADATA_BLOCK_PICTURE タグとして
+                            # Base64エンコードしたFLAC画像ブロック構造体を書き込む
+                            image_data = image.write()
+                            encoded_data = base64.b64encode(image_data).decode("ascii")
                             audio["METADATA_BLOCK_PICTURE"] = [encoded_data]
                         else:
                             audio.add_picture(image)
@@ -454,7 +452,6 @@ class TaskManager:
         self.stop_current_flag = True
         with self.task_queue.mutex:
             self.task_queue.queue.clear()
-        self.task_queue
         self.player.stop_immediate()
         time.sleep(0.1)
         self.stop_current_flag = False
@@ -544,7 +541,6 @@ def on_pause_hotkey():
 
 def setup_hotkeys():
     try:
-        # ★変更: フラット化された設定値を使用
         keyboard.add_hotkey(cfg["hotkey_stop"], on_stop_hotkey)
         keyboard.add_hotkey(cfg["hotkey_pause"], on_pause_hotkey)
     except Exception:
@@ -552,7 +548,7 @@ def setup_hotkeys():
 
 
 def main():
-    # ★追加: コマンドライン引数解析 (-f と --flac 両対応)
+    # ★追加: コマンドライン引数解析
     parser = argparse.ArgumentParser(description="AivisSpeech Clipboard Reader")
     parser.add_argument(
         "-f",
@@ -560,18 +556,41 @@ def main():
         action="store_true",
         help="強制的にFLAC形式で保存します (FFmpegがある場合でも)",
     )
+    # ★追加: 日付上書きオプション
+    parser.add_argument(
+        "-d",
+        "--date",
+        type=str,
+        help="保存時の日付を強制的に指定します (形式: YYMMDD, 例: 251206)",
+    )
     args = parser.parse_args()
 
-    # オプションが指定された場合、synthの設定を更新
-    if args.flac:
+    # 日付オプションのバリデーション
+    if args.date:
+        if not re.match(r"^\d{6}$", args.date):
+            print("❌ エラー: 日付形式が正しくありません。YYMMDD形式 (6桁の数字) で指定してください。")
+            sys.exit(1)
+        cfg["override_date"] = args.date
+        print(f"📅 日付上書きモード: {args.date} として保存します")
+
+
+    # ★変更: 設定ファイルの値 または コマンドライン引数 のどちらかがTrueなら有効にする
+    cfg_force_flac = cfg.get("force_flac", False)
+
+    if args.flac or cfg_force_flac:
         synth.force_flac = True
-        print("🔧 オプション指定: 強制的にFLACで保存します。")
+        if args.flac:
+            print("🔧 オプション指定: 強制的にFLACで保存します。")
+        else:
+            print("🔧 設定ファイル指定: デフォルト設定によりFLACで保存します。")
 
     print(f"✨ AivisSpeech Clipboard Reader v{__version__}")
 
     if HAS_FFMPEG:
-        if args.flac:
-            print("🔧 FFmpeg検出済みですが、--flac(-f)によりFLAC保存を行います。")
+        if synth.force_flac:
+            print(
+                "🔧 FFmpeg検出済みですが、設定またはオプションによりFLAC保存を行います。"
+            )
         else:
             print("🔧 FFmpeg検出: Opus形式での保存を有効化します。")
     else:

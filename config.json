@@ -17,6 +17,7 @@
   "pause": "ctrl+alt+p",
   "artist": "YourVoiceAssistant",
   "album_prefix": "Log",
+  "force_flac": false,
   "dictionary": {
     "Gemini": "ジェミニ",
     "ChatGPT": "チャットジーピーティー",

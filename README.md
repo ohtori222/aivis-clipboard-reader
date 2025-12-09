@@ -33,7 +33,7 @@
 ## 📦 必要要件
 
 - **OS:** Windows (推奨) / macOS / Linux
-- **Python:** 3.8 以上 ※下記 EXE 版は不要 [![Download](https://img.shields.io/github/v/release/ohtori222/aivis-clipboard-reader?label=Download&style=for-the-badge&logo=windows)](https://github.com/ohtori222/aivis-clipboard-reader/releases/latest)
+- **Python:** 3.8 以上 ※EXE 版は Python インストール不要です（DL はこちら） [![Download](https://img.shields.io/github/v/release/ohtori222/aivis-clipboard-reader?label=Download&style=for-the-badge&logo=windows)](https://github.com/ohtori222/aivis-clipboard-reader/releases/latest)
 - **音声合成エンジン:** 以下のいずれかがローカルで起動していること
   - AivisSpeech (推奨)
   - VOICEVOX

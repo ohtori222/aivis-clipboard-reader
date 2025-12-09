@@ -56,7 +56,7 @@ class App(ctk.CTk):
         super().__init__()
 
         # ウィンドウ設定
-        self.title("AivisSpeech Clipboard Reader")
+        self.title(f"AivisSpeech Clipboard Reader v{aivis_reader.__version__}")
         self.geometry("600x650")
 
         # 終了処理
@@ -79,6 +79,7 @@ class App(ctk.CTk):
         sys.stdout = ConsoleRedirector(self.log_textbox, self.parse_log_message)
 
         # 監視スレッド開始
+        # 監視スレッド開始
         self.monitor_thread = threading.Thread(
             target=self.clipboard_monitor_loop, daemon=True
         )
@@ -95,14 +96,27 @@ class App(ctk.CTk):
         self.tab_settings = self.tabview.add("Settings")
 
         # --- Dashboard ---
-        self.status_label = ctk.CTkLabel(
-            self.tab_dashboard, text="Wait...", font=ctk.CTkFont(size=32, weight="bold")
+        self.dashboard_frame = ctk.CTkScrollableFrame(
+            self.tab_dashboard, fg_color="transparent"
         )
-        self.status_label.pack(pady=40)
+        self.dashboard_frame.pack(fill="both", expand=True)
+
+        # アートワーク表示用フレーム (上部に固定) - 初期状態ではpackしない
+        self.artwork_frame = ctk.CTkFrame(self.dashboard_frame, fg_color="transparent")
+
+        # アートワーク表示 (あればここで配置される)
+        self.setup_dashboard_artwork()
+
+        self.status_label = ctk.CTkLabel(
+            self.dashboard_frame,
+            text="Wait...",
+            font=ctk.CTkFont(size=32, weight="bold"),
+        )
+        self.status_label.pack(pady=10)
 
         # 再生コントロール
-        self.control_frame = ctk.CTkFrame(self.tab_dashboard, fg_color="transparent")
-        self.control_frame.pack(pady=20)
+        self.control_frame = ctk.CTkFrame(self.dashboard_frame, fg_color="transparent")
+        self.control_frame.pack(pady=10)
 
         self.btn_pause = ctk.CTkButton(
             self.control_frame,
@@ -137,11 +151,11 @@ class App(ctk.CTk):
         self.btn_skip.grid(row=1, column=0, columnspan=2, pady=20)
 
         self.lbl_info = ctk.CTkLabel(
-            self.tab_dashboard,
+            self.dashboard_frame,
             text="Copy text to clipboard to start reading.",
             text_color="gray",
         )
-        self.lbl_info.pack(side="bottom", pady=20)
+        self.lbl_info.pack(side="bottom", pady=10)
 
         # --- Log ---
         self.log_textbox = ctk.CTkTextbox(
@@ -152,9 +166,64 @@ class App(ctk.CTk):
         # --- Settings ---
         self.create_settings_ui()
 
+    def setup_dashboard_artwork(self):
+        artwork_path = self.cfg.get("artwork_path", "cover.jpg")
+        if not os.path.exists(artwork_path):
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            potential = [
+                f
+                for f in os.listdir(base_dir)
+                if f.lower().startswith("cover.")
+                and f.lower().endswith((".jpg", ".jpeg", ".png"))
+            ]
+            if potential:
+                artwork_path = os.path.join(base_dir, potential[0])
+            else:
+                return
+
+        if os.path.exists(artwork_path):
+            try:
+                pil_image = Image.open(artwork_path)
+                size = (250, 250)
+                self.artwork_image = ctk.CTkImage(
+                    light_image=pil_image, dark_image=pil_image, size=size
+                )
+                self.artwork_label = ctk.CTkLabel(
+                    self.artwork_frame, text="", image=self.artwork_image
+                )
+                self.artwork_label.pack(pady=5)
+
+                if self.cfg.get("show_artwork", True):
+                    self.artwork_frame.pack(fill="x", pady=(5, 0))
+
+                print(f"🖼️ Artwork loaded: {artwork_path}")
+            except Exception as e:
+                print(f"⚠️ Artwork load error: {e}")
+
     def create_settings_ui(self):
         frame = ctk.CTkScrollableFrame(self.tab_settings)
         frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # UI Settings
+        ctk.CTkLabel(
+            frame, text="Display Settings", font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(anchor="w", padx=10, pady=(10, 5))
+
+        self.switch_artwork = ctk.CTkSwitch(
+            frame,
+            text="アートワークを表示 (Show Artwork)",
+            command=self.toggle_artwork_visibility,
+        )
+        (
+            self.switch_artwork.select()
+            if self.cfg.get("show_artwork", True)
+            else self.switch_artwork.deselect()
+        )
+        self.switch_artwork.pack(anchor="w", padx=20, pady=5)
+
+        ctk.CTkLabel(
+            frame, text="Playback Settings", font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(anchor="w", padx=10, pady=(20, 5))
 
         # Speed
         ctk.CTkLabel(frame, text="話速 (Speed)").pack(anchor="w", padx=10)
@@ -183,6 +252,10 @@ class App(ctk.CTk):
         self.slider_volume.pack(fill="x", padx=10, pady=5)
         self.lbl_volume_val = ctk.CTkLabel(frame, text=f"{self.cfg['volume']}")
         self.lbl_volume_val.pack(pady=(0, 10))
+
+        ctk.CTkLabel(
+            frame, text="Connection Settings", font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(anchor="w", padx=10, pady=(20, 5))
 
         # Connection
         ctk.CTkLabel(frame, text="Host").pack(anchor="w", padx=10)
@@ -221,6 +294,16 @@ class App(ctk.CTk):
         val = round(value, 2)
         self.lbl_volume_val.configure(text=str(val))
 
+    def toggle_artwork_visibility(self):
+        show = self.switch_artwork.get() == 1
+        # アートワーク画像の有無に関わらずフレーム自体の表示を切り替え
+        if hasattr(self, "artwork_frame"):
+            if show:
+                # status_labelより前に挿入することで上部配置を維持
+                self.artwork_frame.pack(fill="x", pady=(5, 0), before=self.status_label)
+            else:
+                self.artwork_frame.pack_forget()
+
     def save_settings(self):
         try:
             self.cfg["speed"] = round(self.slider_speed.get(), 2)
@@ -228,6 +311,7 @@ class App(ctk.CTk):
             self.cfg["host"] = self.entry_host.get()
             self.cfg["port"] = int(self.entry_port.get())
             self.cfg["speaker_id"] = int(self.entry_speaker.get())
+            self.cfg["show_artwork"] = self.switch_artwork.get() == 1
 
             # 再接続のためにBase URLを更新
             self.synth.base_url = f"http://{self.cfg['host']}:{self.cfg['port']}"

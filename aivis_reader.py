@@ -18,6 +18,8 @@ import subprocess
 import base64
 import argparse  # ★追加: 引数解析用
 
+__version__ = "0.6.1"
+
 # FLACタグ編集用 (あれば使う)
 try:
     from mutagen.flac import Picture
@@ -31,9 +33,6 @@ except ImportError:
 # FFmpeg検出 (あればOpusエンコードに使用)
 FFMPEG_PATH = shutil.which("ffmpeg")
 HAS_FFMPEG = FFMPEG_PATH is not None
-
-# バージョン情報
-__version__ = "0.6.0"
 
 
 # ─── 設定管理クラス ────────────────────────

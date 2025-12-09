@@ -249,7 +249,8 @@ class AudioPlayer:
 class AivisSynthesizer:
     def __init__(self):
         self.base_url = f"http://{cfg['host']}:{cfg['port']}"
-        self.force_flac = False  # デフォルトはFalseだが、main()で上書きされる可能性あり
+        # ★修正: 設定ファイルからデフォルト値を読み込む
+        self.force_flac = cfg.get("force_flac", False)
 
     def check_connection(self):
         try:

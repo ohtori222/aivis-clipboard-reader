@@ -62,6 +62,13 @@ class ConfigManager:
 
     def __init__(self):
         self.data = self.DEFAULT_CONFIG.copy()
+
+        # デフォルトのアートワークが存在せず、サンプルがある場合はそちらを使用
+        if not os.path.exists(self.data["artwork_path"]) and os.path.exists(
+            "cover_sample.jpg"
+        ):
+            self.data["artwork_path"] = "cover_sample.jpg"
+
         self.load()
 
     def load(self):

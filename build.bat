@@ -34,8 +34,10 @@ if %errorlevel% equ 0 (
     echo [4/4] Copying assets to dist folder...
     copy README.md dist\ > nul
     copy config.json dist\ > nul
-    if exist cover.jpg copy cover.jpg dist\ > nul
-    if exist cover.png copy cover.png dist\ > nul
+
+    REM 配布用にはサンプルアートワークを含める
+    if exist cover_sample.jpg copy cover_sample.jpg dist\ > nul
+    if exist cover_sample.png copy cover_sample.png dist\ > nul
 
     echo.
     echo ========================================================

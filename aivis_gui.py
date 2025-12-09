@@ -4,6 +4,7 @@ import threading
 import time
 import pyperclip
 import queue
+from version import __version__
 import aivis_reader
 from PIL import Image
 import os
@@ -56,7 +57,7 @@ class App(ctk.CTk):
         super().__init__()
 
         # ウィンドウ設定
-        self.title(f"AivisSpeech Clipboard Reader v{aivis_reader.__version__}")
+        self.title(f"AivisSpeech Clipboard Reader v{__version__}")
         self.geometry("600x650")
 
         # 終了処理

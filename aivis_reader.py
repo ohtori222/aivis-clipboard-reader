@@ -18,7 +18,7 @@ import subprocess
 import base64
 import argparse  # ★追加: 引数解析用
 
-__version__ = "0.6.1"
+from version import __version__
 
 # FLACタグ編集用 (あれば使う)
 try:

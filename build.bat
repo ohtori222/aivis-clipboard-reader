@@ -43,17 +43,19 @@ if %errorlevel% equ 0 (
 
     echo.
     echo ========================================================
-    echo  Build Successful!
-    echo  Files are ready in: dist\
-    echo ========================================================
     echo.
-    start explorer dist
-    pause
+
+    if "%CI%"=="true" (
+        echo Skipping explorer open and pause for CI environment.
+    ) else (
+        start explorer dist
+        pause
+    )
 ) else (
     echo.
     echo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     echo  Build Failed. Please check the error messages above.
     echo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     echo.
-    pause
+    if "%CI%" neq "true" pause
 )

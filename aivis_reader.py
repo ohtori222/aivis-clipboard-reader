@@ -58,6 +58,7 @@ class ConfigManager:
         "album_prefix": "Log",
         "dictionary": {},
         "force_flac": False,  # ★追加: デフォルト設定
+        "use_dropbox": False,  # ★追加: Dropbox使用フラグ
     }
 
     def __init__(self):
@@ -312,7 +313,9 @@ class AivisSynthesizer:
         target_ext = ".opus" if use_opus else ".flac"
 
         root_path = cfg["dropbox_dir"]
-        if not root_path:
+
+        # use_dropboxが有効かつカスタムパスが未指定の場合のみ自動検出
+        if not root_path and cfg.get("use_dropbox", False):
             possible = [
                 os.path.join(os.path.expanduser("~"), p)
                 for p in ["Dropbox", "OneDrive"]
@@ -321,6 +324,7 @@ class AivisSynthesizer:
                 if os.path.exists(p):
                     root_path = p
                     break
+
         if not root_path:
             root_path = os.getcwd()
 

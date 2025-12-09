@@ -4,6 +4,7 @@
   "port": 10101,
   "output_dir": "Aivis_AudioLog",
   "dropbox_dir": null,
+  "use_dropbox": false,
   "artwork_path": "cover.jpg",
   "volume": 1.0,
   "speed": 1.0,

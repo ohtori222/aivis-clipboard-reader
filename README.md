@@ -8,6 +8,7 @@
 「Web 記事のながら聴き」や「AI チャットのログ音声化」に最適化されています。
 
 [![Download](https://img.shields.io/github/v/release/ohtori222/aivis-clipboard-reader?label=Download&style=for-the-badge&logo=windows)](https://github.com/ohtori222/aivis-clipboard-reader/releases/latest)
+　![Downloads](https://img.shields.io/github/downloads/ohtori222/aivis-clipboard-reader/total?style=flat-square&logo=github&label=Downloads&color=blue)
 
 ## ✨ 特徴
 
@@ -33,7 +34,7 @@
 ## 📦 必要要件
 
 - **OS:** Windows (推奨) / macOS / Linux
-- **Python:** 3.8 以上 ※EXE 版は Python インストール不要です（DL はこちら） [![Download](https://img.shields.io/github/v/release/ohtori222/aivis-clipboard-reader?label=Download&style=for-the-badge&logo=windows)](https://github.com/ohtori222/aivis-clipboard-reader/releases/latest)
+- **Python:** 3.8 以上 ※EXE 版は Python インストール不要です（DL リンク） [![Download](https://img.shields.io/github/v/release/ohtori222/aivis-clipboard-reader?label=Download&style=for-the-badge&logo=windows)](https://github.com/ohtori222/aivis-clipboard-reader/releases/latest)
 - **音声合成エンジン:** 以下のいずれかがローカルで起動していること
   - AivisSpeech (推奨)
   - VOICEVOX

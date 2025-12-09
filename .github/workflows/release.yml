@@ -1,6 +1,7 @@
 name: Release Build
 
 on:
+  workflow_dispatch: # 手動実行ボタン（デバッグ用に追加）
   push:
     tags:
       - "v*"
@@ -8,6 +9,9 @@ on:
 jobs:
   build-and-release:
     runs-on: windows-latest
+
+    permissions:
+      contents: write # Releaseを作成するために書き込み権限を明示
 
     steps:
       - name: Checkout code
@@ -22,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
 
       - name: Run Build Script
         env:
@@ -34,37 +38,37 @@ jobs:
         run: |
           $repoName = "${{ github.event.repository.name }}"
           $tagName = "${{ github.ref_name }}"
-          $zipName = "${{ github.event.repository.name }}_${{ github.ref_name }}_win_x64.zip"
+          # タグ名が取れない場合（手動実行時など）のフォールバック
+          if ([string]::IsNullOrEmpty($tagName)) { $tagName = "manual-build" }
+
+          $zipName = "${repoName}_${tagName}_win_x64.zip"
 
           echo "Zip Name: $zipName"
 
-          # Check if build.bat already produced a zip (logic assumption based on user request, though build.bat currently only outputs a folder)
-          # The current build.bat outputs to 'dist' folder. It does NOT zip.
-          # So we must zip the content of 'dist'.
-
-          # User logic:
-          # "If build.bat already generated a ZIP, rename it."
-          # "If ZIP is missing (only EXE), zip EXE+images+config+README."
-
-          # Let's check 'dist' content.
+          # distフォルダの中身を確認
           $distPath = "dist"
-          $zipFiles = Get-ChildItem -Path $distPath -Filter *.zip
 
-          if ($zipFiles.Count -gt 0) {
-              echo "Found existing ZIP. Renaming..."
-              $existingZip = $zipFiles[0].FullName
-              Rename-Item -Path $existingZip -NewName $zipName
-              Move-Item -Path "$distPath\$zipName" -Destination .
-          } else {
-              echo "No ZIP found. Creating new ZIP from dist folder..."
-              # Items to zip: EXE, images, config, README
-              # build.bat puts them all in dist/
+          # build.batがZIPを作っているか確認
+          if (Test-Path $distPath) {
+              $zipFiles = Get-ChildItem -Path $distPath -Filter *.zip
               
-              Compress-Archive -Path "$distPath\*" -DestinationPath $zipName
+              if ($zipFiles.Count -gt 0) {
+                  echo "Found existing ZIP. Renaming..."
+                  $existingZip = $zipFiles[0].FullName
+                  Rename-Item -Path $existingZip -NewName $zipName
+                  Move-Item -Path "$distPath\$zipName" -Destination .
+              } else {
+                  echo "No ZIP found. Creating new ZIP from dist folder..."
+                  Compress-Archive -Path "$distPath\*" -DestinationPath $zipName
+              }
+          } else {
+              Write-Error "dist folder not found! Build failed?"
           }
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ${{ github.event.repository.name }}_${{ github.ref_name }}_win_x64.zip
+          files: "*_win_x64.zip"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

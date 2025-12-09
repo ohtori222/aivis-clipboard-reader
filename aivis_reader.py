@@ -33,7 +33,8 @@ FFMPEG_PATH = shutil.which("ffmpeg")
 HAS_FFMPEG = FFMPEG_PATH is not None
 
 # バージョン情報
-__version__ = "0.5.6"
+__version__ = "0.6.0"
+
 
 # ─── 設定管理クラス ────────────────────────
 class ConfigManager:
@@ -99,6 +100,37 @@ class ConfigManager:
 
     def __setitem__(self, key, value):
         self.data[key] = value
+
+    def save_to_local(self):
+        """現在の設定の一部を config.local.json に保存する"""
+        target_keys = [
+            "speed",
+            "volume",
+            "pitch",
+            "intonation",
+            "host",
+            "port",
+            "speaker_id",
+        ]
+        save_data = {}
+
+        # 既存の config.local.json があれば読み込んでマージする
+        if os.path.exists("config.local.json"):
+            try:
+                with open("config.local.json", "r", encoding="utf-8") as f:
+                    save_data = json.load(f)
+            except:
+                pass
+
+        for key in target_keys:
+            save_data[key] = self.data.get(key)
+
+        try:
+            with open("config.local.json", "w", encoding="utf-8") as f:
+                json.dump(save_data, f, indent=2, ensure_ascii=False)
+            print("💾 設定を config.local.json に保存しました")
+        except Exception as e:
+            print(f"⚠️ 設定保存エラー: {e}")
 
 
 # グローバル設定インスタンス
@@ -380,7 +412,6 @@ class AivisSynthesizer:
                     else:
                         current_date_str = datetime.datetime.now().strftime("%y%m%d")
 
-
                     audio["title"] = meta_title
                     audio["artist"] = cfg["artist"]
                     audio["album"] = f"{cfg['album_prefix']}_{current_date_str}"
@@ -448,6 +479,13 @@ class TaskManager:
         self.player.stop_immediate()
         time.sleep(0.1)
         self.stop_current_flag = False
+
+    def skip_current(self):
+        """現在の読み上げのみ中断し、次はそのまま続ける"""
+        self.stop_current_flag = True
+        self.player.stop_immediate()
+        # キューはクリアしない
+        # stop_current_flagにより_workerループ内の合成/再生がbreakされる
 
     def _clean_text(self, text):
         user_dict = cfg.get("dictionary", {})
@@ -519,28 +557,11 @@ class TaskManager:
 
 
 # ─── メインループ ──────────────────────────
-player = AudioPlayer()
-synth = AivisSynthesizer()
-manager = TaskManager(synth, player)
+
+# ─── メインループ ──────────────────────────
 
 
-def on_stop_hotkey():
-    manager.force_stop()
-
-
-def on_pause_hotkey():
-    player.toggle_pause()
-
-
-def setup_hotkeys():
-    try:
-        keyboard.add_hotkey(cfg["hotkey_stop"], on_stop_hotkey)
-        keyboard.add_hotkey(cfg["hotkey_pause"], on_pause_hotkey)
-    except Exception:
-        pass
-
-
-def main():
+def run_cli():
     # ★追加: コマンドライン引数解析
     parser = argparse.ArgumentParser(description="AivisSpeech Clipboard Reader")
     parser.add_argument(
@@ -561,11 +582,31 @@ def main():
     # 日付オプションのバリデーション
     if args.date:
         if not re.match(r"^\d{6}$", args.date):
-            print("❌ エラー: 日付形式が正しくありません。YYMMDD形式 (6桁の数字) で指定してください。")
+            print(
+                "❌ エラー: 日付形式が正しくありません。YYMMDD形式 (6桁の数字) で指定してください。"
+            )
             sys.exit(1)
         cfg["override_date"] = args.date
         print(f"📅 日付上書きモード: {args.date} として保存します")
 
+    # インスタンス生成
+    player = AudioPlayer()
+    synth = AivisSynthesizer()
+    manager = TaskManager(synth, player)
+
+    # ホットキー関数 (クロージャとして定義)
+    def on_stop_hotkey():
+        manager.force_stop()
+
+    def on_pause_hotkey():
+        player.toggle_pause()
+
+    def setup_hotkeys():
+        try:
+            keyboard.add_hotkey(cfg["hotkey_stop"], on_stop_hotkey)
+            keyboard.add_hotkey(cfg["hotkey_pause"], on_pause_hotkey)
+        except Exception:
+            pass
 
     # ★変更: 設定ファイルの値 または コマンドライン引数 のどちらかがTrueなら有効にする
     cfg_force_flac = cfg.get("force_flac", False)
@@ -631,4 +672,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli()

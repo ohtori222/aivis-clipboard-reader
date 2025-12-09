@@ -25,6 +25,8 @@ echo This may take a while...
 
 pyinstaller --noconsole --onefile --clean ^
     --name "AivisClipboardReader" ^
+    --icon "icon.ico" ^
+    --add-data "icon.ico;." ^
     --add-data "%CTK_PATH%;customtkinter" ^
     --collect-all "aivis_reader" ^
     aivis_gui.py

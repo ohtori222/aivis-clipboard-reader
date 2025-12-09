@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="cover_sample.jpg" width="150" height="150">
+</div>
+
 # AivisSpeech Clipboard Reader
 
 クリップボードにコピーされたテキストをリアルタイムで検知し、**AivisSpeech** (または VOICEVOX) を使用して読み上げる Python ツールです。

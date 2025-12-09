@@ -8,6 +8,8 @@ from version import __version__
 import aivis_reader
 from PIL import Image
 import os
+import ctypes
+
 
 # テーマ設定
 ctk.set_appearance_mode("Dark")
@@ -54,11 +56,21 @@ class ConsoleRedirector:
 
 class App(ctk.CTk):
     def __init__(self):
+        # 1. タスクバーアイコンの分離 (AppUserModelID)
+        try:
+            myappid = f"ohtori.aivis_clipboard_reader.app_v2.{__version__}"
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception:
+            pass
+
         super().__init__()
 
         # ウィンドウ設定
         self.title(f"AivisSpeech Clipboard Reader v{__version__}")
         self.geometry("600x650")
+
+        # 2. ウィンドウアイコンの設定
+        self.after(200, self.setup_icon)
 
         # 終了処理
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -86,6 +98,76 @@ class App(ctk.CTk):
         )
         self.monitor_thread.start()
         self.clipboard_running = True
+
+    def setup_icon(self):
+        icon_name = "icon.ico"
+        icon_path = None
+
+        # 優先順位:
+        # 1. PyInstallerバンドル内 (sys._MEIPASS)
+        # 2. EXEと同じ階層 (sys.executable)
+        # 3. スクリプトと同じ階層 (__file__)
+
+        if hasattr(sys, "_MEIPASS"):
+            bundled_path = os.path.join(sys._MEIPASS, icon_name)
+            if os.path.exists(bundled_path):
+                icon_path = bundled_path
+
+        if not icon_path or not os.path.exists(icon_path):
+            if getattr(sys, "frozen", False):
+                exe_dir_path = os.path.join(os.path.dirname(sys.executable), icon_name)
+                if os.path.exists(exe_dir_path):
+                    icon_path = exe_dir_path
+
+        if not icon_path or not os.path.exists(icon_path):
+            dev_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), icon_name
+            )
+            if os.path.exists(dev_path):
+                icon_path = dev_path
+
+        if icon_path and os.path.exists(icon_path):
+            try:
+                # Tkinter標準の方法
+                self.iconbitmap(default=icon_path)
+
+                # Windows APIを使用した強制適用 (タスクバー対策)
+                self.force_windows_icon(icon_path)
+            except Exception as e:
+                print(f"⚠️ アイコン設定失敗: {e}")
+
+    def force_windows_icon(self, icon_path):
+        """Windows APIを使って明示的にアイコンを設定する (タスクバー反映用)"""
+        try:
+            # 定数定義
+            WM_SETICON = 0x0080
+            ICON_SMALL = 0
+            ICON_BIG = 1
+            LR_LOADFROMFILE = 0x0010
+            IMAGE_ICON = 1
+
+            # アイコン読み込み
+            h_icon = ctypes.windll.user32.LoadImageW(
+                None, icon_path, IMAGE_ICON, 0, 0, LR_LOADFROMFILE
+            )
+
+            if h_icon == 0:
+                print("⚠️ Windows API: LoadImageW failed")
+                return
+
+            # HWND取得
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            if hwnd == 0:
+                hwnd = self.winfo_id()
+
+            # メッセージ送信
+            ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, h_icon)
+            ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, h_icon)
+
+            print(f"🪟 Windows API: アイコン適用完了 (HWND: {hwnd})")
+
+        except Exception as e:
+            print(f"⚠️ Windows API Icons Error: {e}")
 
     def setup_ui(self):
         # タブ作成

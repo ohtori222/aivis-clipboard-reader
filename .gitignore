@@ -10,6 +10,9 @@ venv/
 .venv/
 env/
 dist/
+build/
+*.spec
+*.exe
 
 # ── 成果物フォルダ ──
 # 実行時に生成されるFLACログファイルを含むルートフォルダ全体を除外。

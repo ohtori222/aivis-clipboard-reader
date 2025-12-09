@@ -141,6 +141,16 @@ GUI 版の「Settings」タブで保存すると、このファイルが自動�
 }
 ```
 
-## 📜 License
+## 📦 EXE 化して利用する場合
+
+Python 環境構築が面倒な場合、同梱の `build.bat` を実行することで、簡単に実行ファイル（`.exe`）を作成できます。
+
+1.  以下のコマンドを実行します（Windows）。
+    ```cmd
+    .\build.bat
+    ```
+2.  `dist` フォルダに `AivisClipboardReader.exe` が生成されます。
+3.  このファイルを実行するだけで、Python のインストールなしで利用可能です。
+    ※ `cover.jpg` や `config.json` は exe と同じフォルダに置いてください。
 
 [MIT License](LICENSE)

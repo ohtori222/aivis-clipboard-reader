@@ -394,11 +394,17 @@ class AivisSynthesizer:
                     filepath,
                 ]
 
+                # Windowsの場合、コマンドプロンプトが出ないようにフラグを設定
+                creation_flags = 0
+                if os.name == "nt":
+                    creation_flags = 0x08000000  # CREATE_NO_WINDOW
+
                 process = subprocess.Popen(
                     command,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE,
+                    creationflags=creation_flags,
                 )
                 _, stderr = process.communicate(input=audio_input.tobytes())
 

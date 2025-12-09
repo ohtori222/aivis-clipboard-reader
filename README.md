@@ -101,7 +101,7 @@ python aivis_reader.py --flac
 | `output_dir` | 保存先フォルダ名 | `"Aivis_AudioLog"` |
 | `dropbox_dir` | Dropboxのルートパス (nullで自動検出) | `null` |
 | `speed` | 話速 | `1.0` |
-| `force_flac` | FFmpegがあってもOpusを使わずFLACで保存するか | `false` |
+| `force_flac` | FFmpegがあってもOpusを使わずFLACで保存する | `false` |
 | `hotkeys` | 操作キー割り当て | (上記参照) |
 
 ### 🔧 開発者向け: config.local.json

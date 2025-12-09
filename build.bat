@@ -31,11 +31,19 @@ pyinstaller --noconsole --onefile --clean ^
 
 if %errorlevel% equ 0 (
     echo.
+    echo [4/4] Copying assets to dist folder...
+    copy README.md dist\ > nul
+    copy config.json dist\ > nul
+    if exist cover.jpg copy cover.jpg dist\ > nul
+    if exist cover.png copy cover.png dist\ > nul
+
+    echo.
     echo ========================================================
     echo  Build Successful!
-    echo  Executable is located in: dist\AivisClipboardReader.exe
+    echo  Files are ready in: dist\
     echo ========================================================
     echo.
+    start explorer dist
     pause
 ) else (
     echo.

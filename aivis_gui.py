@@ -168,18 +168,24 @@ class App(ctk.CTk):
 
     def setup_dashboard_artwork(self):
         artwork_path = self.cfg.get("artwork_path", "cover.jpg")
+
+        # 存在しない場合、カレントディレクトリの cover_sample.jpg を確認
         if not os.path.exists(artwork_path):
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            potential = [
-                f
-                for f in os.listdir(base_dir)
-                if f.lower().startswith("cover.")
-                and f.lower().endswith((".jpg", ".jpeg", ".png"))
-            ]
-            if potential:
-                artwork_path = os.path.join(base_dir, potential[0])
+            if os.path.exists("cover_sample.jpg"):
+                artwork_path = "cover_sample.jpg"
             else:
-                return
+                # それでもなければ既存の検索ロジック (cover.* の検索)
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                potential = [
+                    f
+                    for f in os.listdir(base_dir)
+                    if f.lower().startswith("cover.")
+                    and f.lower().endswith((".jpg", ".jpeg", ".png"))
+                ]
+                if potential:
+                    artwork_path = os.path.join(base_dir, potential[0])
+                else:
+                    return
 
         if os.path.exists(artwork_path):
             try:

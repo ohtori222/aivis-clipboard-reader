@@ -20,6 +20,14 @@
   - **FFmpeg なしの場合**: **FLAC 形式** で音声を保存します。
   - 日次フォルダ（例: `251204/`）を作成し、ファイル名にタイトルを含めて自動整理します。
 
+## 🔒 プライバシーとセキュリティ
+
+ユーザーのプライバシーを最優先に設計されています。
+
+- **ローカル保存がデフォルト**: 生成された音声ファイルは、デフォルト設定では**PC 内のフォルダ（ローカル）にのみ**保存されます。
+- **クラウドへの自動アップロードなし**: ユーザーが意図して設定を変更しない限り、Dropbox や OneDrive などのクラウドストレージに勝手にファイルがアップロードされることはありません。
+- **オプトイン方式の連携**: Dropbox などの自動保存機能を利用したい場合は、設定ファイル (`config.json` または `config.local.json`) で明示的に機能を有効（オプトイン）にする必要があります。
+
 ## 📦 必要要件
 
 - **OS:** Windows (推奨) / macOS / Linux
@@ -122,14 +130,16 @@ python aivis_gui.py --flac
 プロジェクトルートに `config.json` を置くことで設定を変更できます。
 GUI 版では「Settings」タブから値を変更し、「Save Settings」を押すことで `config.local.json` に保存されます。
 
-| キー          | 説明                                            | デフォルト         |
+| キー | 説明 | デフォルト |
+
 | :------------ | :---------------------------------------------- | :----------------- |
-| `speaker_id`  | 使用するボイスの ID                             | `888753760`        |
-| `output_dir`  | 保存先フォルダ名                                | `"Aivis_AudioLog"` |
-| `dropbox_dir` | Dropbox のルートパス (null で自動検出)          | `null`             |
-| `speed`       | 話速                                            | `1.0`              |
-| `force_flac`  | FFmpeg があっても Opus を使わず FLAC で保存する | `false`            |
-| `hotkeys`     | 操作キー割り当て                                | (上記参照)         |
+| `speaker_id` | 使用するボイスの ID | `888753760` |
+| `output_dir` | 保存先フォルダ名 | `"Aivis_AudioLog"` |
+| `use_dropbox` | Dropbox/OneDrive の自動検出を有効にする (true/false) | `false` |
+| `dropbox_dir` | Dropbox のルートパス (明示的に指定する場合) | `null` |
+| `speed` | 話速 | `1.0` |
+| `force_flac` | FFmpeg があっても Opus を使わず FLAC で保存する | `false` |
+| `hotkeys` | 操作キー割り当て | (上記参照) |
 
 ### 🔧 開発者向け: config.local.json
 

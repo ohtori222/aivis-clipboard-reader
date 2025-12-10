@@ -31,7 +31,7 @@ jobs:
       - name: Run Build Script
         env:
           CI: true
-        run: .\build.bat
+        run: .\scripts\build.bat
 
       - name: Prepare Artifact
         shell: pwsh

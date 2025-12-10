@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 > nul
+pushd %~dp0..
 echo ========================================================
 echo  Running Formatters and Linters
 echo ========================================================

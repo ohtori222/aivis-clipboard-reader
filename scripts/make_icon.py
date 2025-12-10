@@ -2,8 +2,9 @@ import os
 
 from PIL import Image
 
-src = "assets/cover_sample.jpg"
-dst = "assets/icon.ico"
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src = os.path.join(base_dir, "assets/cover_sample.jpg")
+dst = os.path.join(base_dir, "assets/icon.ico")
 
 if os.path.exists(src):
     try:

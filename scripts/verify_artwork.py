@@ -2,7 +2,7 @@ import os
 import sys
 
 # srcディレクトリをパスに追加
-sys.path.append(os.path.join(os.getcwd(), "src"))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
 from aivis_reader import ConfigManager  # noqa: E402
 

@@ -48,4 +48,4 @@ jobs:
       - name: Verify Build Script (Dry Run)
         # 実際に exe を作れるか確認（ビルドエラーがないかチェック）
         run: |
-          cmd /c build.bat
+          cmd /c scripts\build.bat

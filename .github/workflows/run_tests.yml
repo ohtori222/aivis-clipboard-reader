@@ -35,6 +35,9 @@ jobs:
           echo "Checking static analysis..."
           flake8 .
 
+      - name: Security Check
+        run: pip-audit
+
       - name: Run Tests
         run: |
           pytest -v

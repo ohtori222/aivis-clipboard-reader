@@ -1,3 +1,4 @@
+urllib3>=2.6.1
 requests
 numpy
 sounddevice
@@ -11,3 +12,4 @@ pillow
 black
 isort
 flake8
+pip-audit

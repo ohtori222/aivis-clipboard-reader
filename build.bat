@@ -37,6 +37,7 @@ if %errorlevel% equ 0 (
     echo [4/4] Copying assets to dist folder...
     copy README.md dist\ > nul
     copy config.json dist\ > nul
+    copy "はじめにお読みください.txt" dist\ > nul
 
     REM `assets` フォルダをそのまま `dist` にコピー
     if exist assets (

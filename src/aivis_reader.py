@@ -67,8 +67,8 @@ class ConfigManager:
         "min_length": 10,
         "require_hiragana": True,
         "stop_command": ";;STOP",
-        "hotkey_stop": "ctrl+alt+s",
-        "hotkey_pause": "ctrl+alt+p",
+        "stop": "ctrl+alt+s",
+        "pause": "ctrl+alt+p",
         "artist": "AivisReader",
         "album_prefix": "Log",
         "dictionary": {},
@@ -151,16 +151,7 @@ class ConfigManager:
         self.data[key] = value
 
     def save_to_local(self):
-        """現在の設定の一部を config.local.json に保存する"""
-        target_keys = [
-            "speed",
-            "volume",
-            "pitch",
-            "intonation",
-            "host",
-            "port",
-            "speaker_id",
-        ]
+        """設定を config.local.json に保存する (dictionary 以外)"""
         save_data = {}
         local_config_path = os.path.join(self.root_dir, "config.local.json")
 
@@ -168,12 +159,17 @@ class ConfigManager:
         if os.path.exists(local_config_path):
             try:
                 with open(local_config_path, "r", encoding="utf-8") as f:
-                    save_data = json.load(f)
+                    existing_data = json.load(f)
+                    save_data.update(existing_data)
             except Exception:
                 pass
 
-        for key in target_keys:
-            save_data[key] = self.data.get(key)
+        # dictionary と内部管理用キー以外を保存
+        excluded_keys = ["dictionary", "override_date"]
+
+        for key, value in self.data.items():
+            if key not in excluded_keys:
+                save_data[key] = value
 
         try:
             with open(local_config_path, "w", encoding="utf-8") as f:
@@ -664,8 +660,8 @@ def run_cli():
 
     def setup_hotkeys():
         try:
-            keyboard.add_hotkey(cfg["hotkey_stop"], on_stop_hotkey)
-            keyboard.add_hotkey(cfg["hotkey_pause"], on_pause_hotkey)
+            keyboard.add_hotkey(cfg["stop"], on_stop_hotkey)
+            keyboard.add_hotkey(cfg["pause"], on_pause_hotkey)
         except Exception:
             pass
 

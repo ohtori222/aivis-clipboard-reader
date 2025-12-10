@@ -72,10 +72,8 @@
      "speaker_id": 888753760,
      "host": "127.0.0.1",
      "port": 10101,
-     "hotkeys": {
-       "stop": "ctrl+alt+s",
-       "pause": "ctrl+alt+p"
-     }
+     "stop": "ctrl+alt+s",
+     "pause": "ctrl+alt+p"
    }
    ```
 
@@ -144,7 +142,8 @@ GUI 版では「Settings」タブから値を変更し、「Save Settings」を�
 | `dropbox_dir` | Dropbox のルートパス (明示的に指定する場合)          | `null`             |
 | `speed`       | 話速                                                 | `1.0`              |
 | `force_flac`  | FFmpeg があっても Opus を使わず FLAC で保存する      | `false`            |
-| `hotkeys`     | 操作キー割り当て                                     | (上記参照)         |
+| `stop`        | 停止ホットキー                                       | `"ctrl+alt+s"`     |
+| `pause`       | 一時停止ホットキー                                   | `"ctrl+alt+p"`     |
 
 ### 🔧 開発者向け: config.local.json
 

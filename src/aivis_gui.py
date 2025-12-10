@@ -275,12 +275,15 @@ class App(ctk.CTk):
                 print(f"⚠️ Artwork load error: {e}")
 
     def create_settings_ui(self):
+        # 内部で Entry/Slider などを保持する辞書
+        self.settings_widgets = {}
+
         frame = ctk.CTkScrollableFrame(self.tab_settings)
         frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # UI Settings
+        # ─── Display Settings ───
         ctk.CTkLabel(
-            frame, text="Display Settings", font=ctk.CTkFont(size=14, weight="bold")
+            frame, text="Display Settings", font=ctk.CTkFont(size=16, weight="bold")
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
         self.switch_artwork = ctk.CTkSwitch(
@@ -295,78 +298,184 @@ class App(ctk.CTk):
         )
         self.switch_artwork.pack(anchor="w", padx=20, pady=5)
 
+        # ─── File / Path Settings ───
         ctk.CTkLabel(
-            frame, text="Playback Settings", font=ctk.CTkFont(size=14, weight="bold")
+            frame, text="File / Path Settings", font=ctk.CTkFont(size=16, weight="bold")
         ).pack(anchor="w", padx=10, pady=(20, 5))
 
-        # Speed
-        ctk.CTkLabel(frame, text="話速 (Speed)").pack(anchor="w", padx=10)
+        # Output Dir
+        self._add_entry(frame, "output_dir", "Output Directory")
+
+        # Dropbox / Cloud
+        self._add_switch(frame, "use_dropbox", "Use Dropbox / Cloud Storage")
+        self._add_entry(frame, "dropbox_dir", "Dropbox Directory (Optional)")
+
+        # Artwork Path
+        self._add_entry(frame, "artwork_path", "Artwork Path")
+
+        # Force FLAC
+        self._add_switch(frame, "force_flac", "Force FLAC Format (No Opus)")
+
+        # ─── Playback (Audio) Settings ───
+        ctk.CTkLabel(
+            frame, text="Playback Settings", font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(anchor="w", padx=10, pady=(20, 5))
+
+        # Speed (Slider)
+        ctk.CTkLabel(frame, text="話速 (Speed)").pack(anchor="w", padx=20)
         self.slider_speed = ctk.CTkSlider(
             frame,
             from_=0.5,
             to=3.0,
             number_of_steps=25,
-            command=self.update_speed_label,
+            command=lambda v: self._update_label("speed", v),
         )
         self.slider_speed.set(self.cfg["speed"])
-        self.slider_speed.pack(fill="x", padx=10, pady=5)
-        self.lbl_speed_val = ctk.CTkLabel(frame, text=f"{self.cfg['speed']}")
-        self.lbl_speed_val.pack(pady=(0, 10))
+        self.slider_speed.pack(fill="x", padx=20, pady=5)
+        self.settings_widgets["lbl_speed"] = ctk.CTkLabel(
+            frame, text=f"{self.cfg['speed']}"
+        )
+        self.settings_widgets["lbl_speed"].pack(pady=(0, 5))
 
-        # Volume
-        ctk.CTkLabel(frame, text="音量 (Volume)").pack(anchor="w", padx=10)
+        # Volume (Slider)
+        ctk.CTkLabel(frame, text="音量 (Volume)").pack(anchor="w", padx=20)
         self.slider_volume = ctk.CTkSlider(
             frame,
             from_=0.0,
             to=2.0,
             number_of_steps=20,
-            command=self.update_volume_label,
+            command=lambda v: self._update_label("volume", v),
         )
         self.slider_volume.set(self.cfg["volume"])
-        self.slider_volume.pack(fill="x", padx=10, pady=5)
-        self.lbl_volume_val = ctk.CTkLabel(frame, text=f"{self.cfg['volume']}")
-        self.lbl_volume_val.pack(pady=(0, 10))
+        self.slider_volume.pack(fill="x", padx=20, pady=5)
+        self.settings_widgets["lbl_volume"] = ctk.CTkLabel(
+            frame, text=f"{self.cfg['volume']}"
+        )
+        self.settings_widgets["lbl_volume"].pack(pady=(0, 5))
 
+        # Pitch (Slider)
+        ctk.CTkLabel(frame, text="高さ (Pitch) [-0.15 ~ 0.15]").pack(
+            anchor="w", padx=20
+        )
+        self.slider_pitch = ctk.CTkSlider(
+            frame,
+            from_=-0.2,
+            to=0.2,
+            number_of_steps=40,
+            command=lambda v: self._update_label("pitch", v),
+        )
+        self.slider_pitch.set(self.cfg.get("pitch", 0.0))
+        self.slider_pitch.pack(fill="x", padx=20, pady=5)
+        self.settings_widgets["lbl_pitch"] = ctk.CTkLabel(
+            frame, text=f"{self.cfg.get('pitch', 0.0)}"
+        )
+        self.settings_widgets["lbl_pitch"].pack(pady=(0, 5))
+
+        # Intonation (Slider)
+        ctk.CTkLabel(frame, text="抑揚 (Intonation) [0.0 ~ 2.0]").pack(
+            anchor="w", padx=20
+        )
+        self.slider_intonation = ctk.CTkSlider(
+            frame,
+            from_=0.0,
+            to=2.0,
+            number_of_steps=20,
+            command=lambda v: self._update_label("intonation", v),
+        )
+        self.slider_intonation.set(self.cfg.get("intonation", 1.0))
+        self.slider_intonation.pack(fill="x", padx=20, pady=5)
+        self.settings_widgets["lbl_intonation"] = ctk.CTkLabel(
+            frame, text=f"{self.cfg.get('intonation', 1.0)}"
+        )
+        self.settings_widgets["lbl_intonation"].pack(pady=(0, 5))
+
+        # Post Pause (Slider)
+        ctk.CTkLabel(frame, text="読上後ポーズ (Post Pause) [sec]").pack(
+            anchor="w", padx=20
+        )
+        self.slider_post_pause = ctk.CTkSlider(
+            frame,
+            from_=0.0,
+            to=2.0,
+            number_of_steps=20,
+            command=lambda v: self._update_label("post_pause", v),
+        )
+        self.slider_post_pause.set(self.cfg.get("post_pause", 0.3))
+        self.slider_post_pause.pack(fill="x", padx=20, pady=5)
+        self.settings_widgets["lbl_post_pause"] = ctk.CTkLabel(
+            frame, text=f"{self.cfg.get('post_pause', 0.3)}"
+        )
+        self.settings_widgets["lbl_post_pause"].pack(pady=(0, 5))
+
+        # ─── Metadata Settings ───
         ctk.CTkLabel(
-            frame, text="Connection Settings", font=ctk.CTkFont(size=14, weight="bold")
+            frame, text="Metadata Settings", font=ctk.CTkFont(size=16, weight="bold")
         ).pack(anchor="w", padx=10, pady=(20, 5))
 
-        # Connection
-        ctk.CTkLabel(frame, text="Host").pack(anchor="w", padx=10)
-        self.entry_host = ctk.CTkEntry(frame)
-        self.entry_host.insert(0, str(self.cfg["host"]))
-        self.entry_host.pack(fill="x", padx=10, pady=5)
+        self._add_entry(frame, "artist", "Artist Name")
+        self._add_entry(frame, "album_prefix", "Album Prefix")
 
-        ctk.CTkLabel(frame, text="Port").pack(anchor="w", padx=10)
-        self.entry_port = ctk.CTkEntry(frame)
-        self.entry_port.insert(0, str(self.cfg["port"]))
-        self.entry_port.pack(fill="x", padx=10, pady=5)
+        # ─── Control Settings ───
+        ctk.CTkLabel(
+            frame, text="Control Settings", font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(anchor="w", padx=10, pady=(20, 5))
 
-        ctk.CTkLabel(frame, text="Speaker ID").pack(anchor="w", padx=10)
-        self.entry_speaker = ctk.CTkEntry(frame)
-        self.entry_speaker.insert(0, str(self.cfg["speaker_id"]))
-        self.entry_speaker.pack(fill="x", padx=10, pady=5)
+        self._add_switch(
+            frame, "require_hiragana", "日本語(ひらがな)を含む場合のみ読み上げる"
+        )
+        self._add_entry(frame, "min_length", "Min Length (文字数)")
+        self._add_entry(frame, "stop_command", "Stop Command (Text)")
+        self._add_entry(frame, "stop", "Stop Hotkey (e.g. ctrl+alt+s)")
+        self._add_entry(frame, "pause", "Pause Hotkey (e.g. ctrl+alt+p)")
 
-        # Save Button
+        # ─── Connection Settings ───
+        ctk.CTkLabel(
+            frame, text="Connection Settings", font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(anchor="w", padx=10, pady=(20, 5))
+
+        self._add_entry(frame, "host", "Host")
+        self._add_entry(frame, "port", "Port")
+        self._add_entry(frame, "speaker_id", "Speaker ID")
+
+        # ─── Save Button ───
         self.btn_save = ctk.CTkButton(
             frame,
             text="Save Settings",
             command=self.save_settings,
             fg_color="green",
             hover_color="darkgreen",
+            height=40,
+            font=ctk.CTkFont(size=16, weight="bold"),
         )
-        self.btn_save.pack(pady=30)
+        self.btn_save.pack(pady=30, fill="x", padx=40)
 
         self.lbl_save_status = ctk.CTkLabel(frame, text="")
-        self.lbl_save_status.pack()
+        self.lbl_save_status.pack(pady=(0, 20))
 
-    def update_speed_label(self, value):
-        val = round(value, 2)
-        self.lbl_speed_val.configure(text=str(val))
+    def _add_entry(self, parent, key, label_text):
+        """Helper to add labelled entry"""
+        ctk.CTkLabel(parent, text=label_text).pack(anchor="w", padx=20)
+        entry = ctk.CTkEntry(parent)
+        val = self.cfg.get(key)
+        # Noneの場合は空文字にする
+        entry.insert(0, str(val) if val is not None else "")
+        entry.pack(fill="x", padx=20, pady=(0, 10))
+        self.settings_widgets[key] = entry
 
-    def update_volume_label(self, value):
+    def _add_switch(self, parent, key, label_text):
+        """Helper to add switch"""
+        switch = ctk.CTkSwitch(parent, text=label_text)
+        if self.cfg.get(key, False):
+            switch.select()
+        else:
+            switch.deselect()
+        switch.pack(anchor="w", padx=20, pady=(5, 10))
+        self.settings_widgets[key] = switch
+
+    def _update_label(self, key, value):
         val = round(value, 2)
-        self.lbl_volume_val.configure(text=str(val))
+        if f"lbl_{key}" in self.settings_widgets:
+            self.settings_widgets[f"lbl_{key}"].configure(text=str(val))
 
     def toggle_artwork_visibility(self):
         show = self.switch_artwork.get() == 1
@@ -380,20 +489,60 @@ class App(ctk.CTk):
 
     def save_settings(self):
         try:
+            # Sliders
             self.cfg["speed"] = round(self.slider_speed.get(), 2)
             self.cfg["volume"] = round(self.slider_volume.get(), 2)
-            self.cfg["host"] = self.entry_host.get()
-            self.cfg["port"] = int(self.entry_port.get())
-            self.cfg["speaker_id"] = int(self.entry_speaker.get())
+            self.cfg["pitch"] = round(self.slider_pitch.get(), 2)
+            self.cfg["intonation"] = round(self.slider_intonation.get(), 2)
+            self.cfg["post_pause"] = round(self.slider_post_pause.get(), 2)
+
+            # Switches
             self.cfg["show_artwork"] = self.switch_artwork.get() == 1
+            self.cfg["use_dropbox"] = self.settings_widgets["use_dropbox"].get() == 1
+            self.cfg["force_flac"] = self.settings_widgets["force_flac"].get() == 1
+            self.cfg["require_hiragana"] = (
+                self.settings_widgets["require_hiragana"].get() == 1
+            )
+
+            # Entries
+            # 数値変換が必要なもの
+            try:
+                self.cfg["port"] = int(self.settings_widgets["port"].get())
+                self.cfg["speaker_id"] = int(self.settings_widgets["speaker_id"].get())
+                self.cfg["min_length"] = int(self.settings_widgets["min_length"].get())
+            except ValueError:
+                raise ValueError("Port, Speaker ID, Min Length must be integers.")
+
+            # 文字列
+            self.cfg["host"] = self.settings_widgets["host"].get()
+            self.cfg["output_dir"] = self.settings_widgets["output_dir"].get()
+
+            # dropbox_dir が空文字なら None に戻す
+            ddir = self.settings_widgets["dropbox_dir"].get()
+            self.cfg["dropbox_dir"] = ddir if ddir.strip() else None
+
+            self.cfg["artwork_path"] = self.settings_widgets["artwork_path"].get()
+            self.cfg["artist"] = self.settings_widgets["artist"].get()
+            self.cfg["album_prefix"] = self.settings_widgets["album_prefix"].get()
+            self.cfg["stop_command"] = self.settings_widgets["stop_command"].get()
+            self.cfg["stop"] = self.settings_widgets["stop"].get()
+            self.cfg["pause"] = self.settings_widgets["pause"].get()
 
             # 再接続のためにBase URLを更新
             self.synth.base_url = f"http://{self.cfg['host']}:{self.cfg['port']}"
 
+            # サーバー側にも設定反映 (force_flacなど)
+            self.synth.force_flac = self.cfg["force_flac"]
+
             self.cfg.save_to_local()
             self.lbl_save_status.configure(
-                text="Saved to config.local.json!", text_color="green"
+                text="Saved to config.local.json! (Some changes require restart)",
+                text_color="green",
             )
+
+            # アートワーク表示更新
+            self.setup_dashboard_artwork()
+
         except Exception as e:
             self.lbl_save_status.configure(text=f"Error: {e}", text_color="red")
 

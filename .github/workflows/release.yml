@@ -51,7 +51,7 @@ jobs:
           # build.batがZIPを作っているか確認
           if (Test-Path $distPath) {
               $zipFiles = Get-ChildItem -Path $distPath -Filter *.zip
-              
+
               if ($zipFiles.Count -gt 0) {
                   echo "Found existing ZIP. Renaming..."
                   $existingZip = $zipFiles[0].FullName

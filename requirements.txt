@@ -13,3 +13,4 @@ black
 isort
 flake8
 pip-audit
+pre-commit

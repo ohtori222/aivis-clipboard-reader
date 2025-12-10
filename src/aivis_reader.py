@@ -85,7 +85,9 @@ class ConfigManager:
 
         # アートワークの自動検出ロジック (設定読み込み後に実行)
         # 現在設定されているパスが存在しない場合のみ、代替パスを探す
-        current_artwork_full = os.path.join(self.root_dir, self.data["artwork_path"])
+        current_artwork_full = os.path.join(
+            self.root_dir, str(self.data["artwork_path"])
+        )
 
         if not os.path.exists(current_artwork_full):
             # 優先順位:
@@ -188,7 +190,7 @@ cfg = ConfigManager()
 # ─── プレーヤー (ストリーム再生・常時接続版) ────────────────
 class AudioPlayer:
     def __init__(self):
-        self.queue = queue.Queue()
+        self.queue: queue.Queue = queue.Queue()
         self.stop_flag = threading.Event()
         self.is_paused = False
         # ストリーム管理用
@@ -382,9 +384,9 @@ class AivisSynthesizer:
 
         try:
             existing_files = [
-                f
-                for f in os.listdir(daily_save_dir)
-                if f.endswith((".flac", ".ogg", ".opus"))
+                filename
+                for filename in os.listdir(daily_save_dir)
+                if filename.endswith((".flac", ".ogg", ".opus"))
             ]
             track_number = len(existing_files) + 1
         except OSError as e:
@@ -441,7 +443,7 @@ class AivisSynthesizer:
                     creation_flags = 0x08000000  # CREATE_NO_WINDOW
 
                 process = subprocess.Popen(
-                    command,
+                    command,  # type: ignore
                     stdin=subprocess.PIPE,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE,
@@ -454,8 +456,8 @@ class AivisSynthesizer:
                     print(f"⚠️ FFmpegエラー詳細: {err_msg}")
                     raise Exception(f"FFmpeg failed (Code: {process.returncode})")
             else:
-                with open(filepath, "wb") as f:
-                    sf.write(f, full_audio, sr, format="FLAC")
+                with open(filepath, "wb") as audio_file:
+                    sf.write(audio_file, full_audio, sr, format="FLAC")
 
             if HAS_MUTAGEN:
                 audio = MutagenFile(filepath)
@@ -488,8 +490,8 @@ class AivisSynthesizer:
                         else:
                             image.mime = "image/png"
 
-                        with open(artwork, "rb") as f:
-                            image.data = f.read()
+                        with open(artwork, "rb") as artwork_file:
+                            image.data = artwork_file.read()
 
                         if use_opus:
                             # Opus (Ogg) の場合は METADATA_BLOCK_PICTURE タグとして
@@ -518,7 +520,7 @@ class TaskManager:
     def __init__(self, synth, player):
         self.synth = synth
         self.player = player
-        self.task_queue = queue.Queue()
+        self.task_queue: queue.Queue[str] = queue.Queue()
         self.stop_current_flag = False
 
         self.thread = threading.Thread(target=self._worker, daemon=True)

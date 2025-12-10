@@ -26,7 +26,7 @@ class ConsoleRedirector:
     def __init__(self, text_widget, callback=None):
         self.text_widget = text_widget
         self.callback = callback
-        self.queue = queue.Queue()
+        self.queue: queue.Queue[str] = queue.Queue()
         self.running = True
         self.thread = threading.Thread(target=self._update_loop, daemon=True)
         self.thread.start()
@@ -47,7 +47,8 @@ class ConsoleRedirector:
             except queue.Empty:
                 pass
             except Exception as e:
-                sys.__stdout__.write(f"Console Error: {e}\n")
+                if sys.__stdout__:
+                    sys.__stdout__.write(f"Console Error: {e}\n")
 
     def _safe_insert(self, message):
         self.text_widget.configure(state="normal")
@@ -93,7 +94,9 @@ class App(ctk.CTk):
         self.setup_ui()
 
         # コンソールリダイレクト
-        sys.stdout = ConsoleRedirector(self.log_textbox, self.parse_log_message)
+        sys.stdout = ConsoleRedirector(
+            self.log_textbox, self.parse_log_message
+        )  # type: ignore
 
         # 監視スレッド開始
         # 監視スレッド開始

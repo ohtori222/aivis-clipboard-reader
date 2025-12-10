@@ -14,6 +14,8 @@ build/
 *.spec
 *.exe
 test_output.txt
+.coverage
+htmlcov/
 
 # ── 成果物フォルダ ──
 # 実行時に生成されるFLACログファイルを含むルートフォルダ全体を除外。

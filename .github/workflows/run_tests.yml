@@ -24,8 +24,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --upgrade setuptools
           pip install -r requirements.txt
-          pip install pytest pytest-mock
-          pip install black isort flake8
+          pip install pytest pytest-mock pytest-cov
+          pip install black isort flake8 mypy types-requests types-setuptools
 
       - name: Encure Code Quality (Lint & Format Check)
         run: |
@@ -35,13 +35,15 @@ jobs:
           black . --check --diff
           echo "Checking static analysis..."
           flake8 .
+          echo "Checking type safety..."
+          mypy .
 
       - name: Security Check
         run: pip-audit
 
-      - name: Run Tests
+      - name: Run Tests with Coverage
         run: |
-          pytest -v
+          pytest -v --cov=src --cov-report=term-missing
 
       - name: Verify Build Script (Dry Run)
         # 実際に exe を作れるか確認（ビルドエラーがないかチェック）

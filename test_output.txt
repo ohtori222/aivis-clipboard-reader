@@ -1,0 +1,44 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.1, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\yoshi\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\dev\ai\aivis_clip_monitor
+plugins: mock-3.15.1
+collecting ... collected 0 items / 3 errors
+
+=================================== ERRORS ====================================
+___________________ ERROR collecting tests/test_cli_args.py ___________________
+ImportError while importing test module 'C:\dev\ai\aivis_clip_monitor\tests\test_cli_args.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\yoshi\AppData\Local\Programs\Python\Python313\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_cli_args.py:3: in <module>
+    from src.aivis_reader import run_cli
+E   ModuleNotFoundError: No module named 'src'
+____________________ ERROR collecting tests/test_config.py ____________________
+ImportError while importing test module 'C:\dev\ai\aivis_clip_monitor\tests\test_config.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\yoshi\AppData\Local\Programs\Python\Python313\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_config.py:8: in <module>
+    from src.aivis_reader import ConfigManager, get_project_root
+E   ModuleNotFoundError: No module named 'src'
+_________________ ERROR collecting tests/test_text_cleaner.py _________________
+ImportError while importing test module 'C:\dev\ai\aivis_clip_monitor\tests\test_text_cleaner.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\yoshi\AppData\Local\Programs\Python\Python313\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_text_cleaner.py:3: in <module>
+    from src.aivis_reader import TaskManager, ConfigManager
+E   ModuleNotFoundError: No module named 'src'
+=========================== short test summary info ===========================
+ERROR tests/test_cli_args.py
+ERROR tests/test_config.py
+ERROR tests/test_text_cleaner.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!
+============================== 3 errors in 0.32s ==============================

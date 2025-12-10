@@ -552,12 +552,13 @@ class TaskManager:
                 text = text.replace(k, v)
 
         text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
-        text = re.sub(r"http\S+", "", text)
         text = re.sub(r"[-=]{2,}", "", text)
         text = re.sub(r"[#\*`>]", "", text)
         text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
         text = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)
         text = re.sub(r"[一-龠々]+\s*[（\(]([ぁ-んァ-ン]+)[）\)]", r"\1", text)
+
+        text = re.sub(r"http\S+", "", text)
 
         text = re.sub(r"[ \t]+", " ", text)
 

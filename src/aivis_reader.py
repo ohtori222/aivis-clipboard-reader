@@ -36,6 +36,21 @@ HAS_FFMPEG = FFMPEG_PATH is not None
 
 
 # ─── 設定管理クラス ────────────────────────
+def get_project_root():
+    """
+    開発環境(src/main.py)と実行ファイル(exe)の両方で、
+    プロジェクトのルートディレクトリ（config.jsonがある場所）を正しく返す
+    """
+    if getattr(sys, "frozen", False):
+        # EXE実行時: EXEファイルがある場所
+        return os.path.dirname(sys.executable)
+    else:
+        # スクリプト実行時: srcフォルダの「一つ上」の階層
+        # __file__ = src/aivis_reader.py -> parent = src -> parent = root
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.dirname(current_dir)
+
+
 class ConfigManager:
     DEFAULT_CONFIG = {
         "speaker_id": 888753760,
@@ -64,25 +79,32 @@ class ConfigManager:
     def __init__(self):
         self.data = self.DEFAULT_CONFIG.copy()
 
+        self.root_dir = get_project_root()
+
         # デフォルトのアートワークが存在せず、サンプルがある場合はそちらを使用
-        if not os.path.exists(self.data["artwork_path"]) and os.path.exists(
-            "cover_sample.jpg"
-        ):
+        # パスはルートディレクトリ基準で解決する
+        artwork_full_path = os.path.join(self.root_dir, self.data["artwork_path"])
+        sample_full_path = os.path.join(self.root_dir, "cover_sample.jpg")
+
+        if not os.path.exists(artwork_full_path) and os.path.exists(sample_full_path):
             self.data["artwork_path"] = "cover_sample.jpg"
 
         self.load()
 
     def load(self):
-        if os.path.exists("config.json"):
+        config_path = os.path.join(self.root_dir, "config.json")
+        local_config_path = os.path.join(self.root_dir, "config.local.json")
+
+        if os.path.exists(config_path):
             try:
-                with open("config.json", "r", encoding="utf-8") as f:
+                with open(config_path, "r", encoding="utf-8") as f:
                     self._deep_update(self.data, json.load(f))
             except (OSError, json.JSONDecodeError) as e:
                 print(f"⚠️ config.json 読み込みエラー: {e}")
 
-        if os.path.exists("config.local.json"):
+        if os.path.exists(local_config_path):
             try:
-                with open("config.local.json", "r", encoding="utf-8") as f:
+                with open(local_config_path, "r", encoding="utf-8") as f:
                     self._deep_update(self.data, json.load(f))
                     print("🔧 config.local.json を適用しました")
             except (OSError, json.JSONDecodeError) as e:
@@ -120,11 +142,12 @@ class ConfigManager:
             "speaker_id",
         ]
         save_data = {}
+        local_config_path = os.path.join(self.root_dir, "config.local.json")
 
         # 既存の config.local.json があれば読み込んでマージする
-        if os.path.exists("config.local.json"):
+        if os.path.exists(local_config_path):
             try:
-                with open("config.local.json", "r", encoding="utf-8") as f:
+                with open(local_config_path, "r", encoding="utf-8") as f:
                     save_data = json.load(f)
             except:
                 pass
@@ -133,7 +156,7 @@ class ConfigManager:
             save_data[key] = self.data.get(key)
 
         try:
-            with open("config.local.json", "w", encoding="utf-8") as f:
+            with open(local_config_path, "w", encoding="utf-8") as f:
                 json.dump(save_data, f, indent=2, ensure_ascii=False)
             print("💾 設定を config.local.json に保存しました")
         except Exception as e:

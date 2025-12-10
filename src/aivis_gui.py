@@ -6,6 +6,7 @@ import pyperclip
 import queue
 from version import __version__
 import aivis_reader
+from aivis_reader import get_project_root
 from PIL import Image
 import os
 import ctypes
@@ -103,28 +104,17 @@ class App(ctk.CTk):
         icon_name = "icon.ico"
         icon_path = None
 
+        root_dir = get_project_root()
+        icon_path = os.path.join(root_dir, icon_name)
+
         # 優先順位:
         # 1. PyInstallerバンドル内 (sys._MEIPASS)
-        # 2. EXEと同じ階層 (sys.executable)
-        # 3. スクリプトと同じ階層 (__file__)
+        # 2. get_project_root() で取得したパス
 
         if hasattr(sys, "_MEIPASS"):
             bundled_path = os.path.join(sys._MEIPASS, icon_name)
             if os.path.exists(bundled_path):
                 icon_path = bundled_path
-
-        if not icon_path or not os.path.exists(icon_path):
-            if getattr(sys, "frozen", False):
-                exe_dir_path = os.path.join(os.path.dirname(sys.executable), icon_name)
-                if os.path.exists(exe_dir_path):
-                    icon_path = exe_dir_path
-
-        if not icon_path or not os.path.exists(icon_path):
-            dev_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), icon_name
-            )
-            if os.path.exists(dev_path):
-                icon_path = dev_path
 
         if icon_path and os.path.exists(icon_path):
             try:
@@ -251,22 +241,27 @@ class App(ctk.CTk):
 
     def setup_dashboard_artwork(self):
         artwork_path = self.cfg.get("artwork_path", "cover.jpg")
+        root_dir = get_project_root()
+
+        # パスが相対パスならルート基準にする
+        if not os.path.isabs(artwork_path):
+            artwork_path = os.path.join(root_dir, artwork_path)
 
         # 存在しない場合、カレントディレクトリの cover_sample.jpg を確認
         if not os.path.exists(artwork_path):
-            if os.path.exists("cover_sample.jpg"):
-                artwork_path = "cover_sample.jpg"
+            sample_path = os.path.join(root_dir, "cover_sample.jpg")
+            if os.path.exists(sample_path):
+                artwork_path = sample_path
             else:
                 # それでもなければ既存の検索ロジック (cover.* の検索)
-                base_dir = os.path.dirname(os.path.abspath(__file__))
                 potential = [
                     f
-                    for f in os.listdir(base_dir)
+                    for f in os.listdir(root_dir)
                     if f.lower().startswith("cover.")
                     and f.lower().endswith((".jpg", ".jpeg", ".png"))
                 ]
                 if potential:
-                    artwork_path = os.path.join(base_dir, potential[0])
+                    artwork_path = os.path.join(root_dir, potential[0])
                 else:
                     return
 

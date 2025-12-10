@@ -28,8 +28,9 @@ pyinstaller --noconsole --onefile --clean ^
     --icon "icon.ico" ^
     --add-data "icon.ico;." ^
     --add-data "%CTK_PATH%;customtkinter" ^
-    --collect-all "aivis_reader" ^
-    aivis_gui.py
+    --collect-all "src" ^
+    --paths "src" ^
+    src\aivis_gui.py
 
 if %errorlevel% equ 0 (
     echo.

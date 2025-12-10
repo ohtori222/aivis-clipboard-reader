@@ -1,30 +1,31 @@
-import sys
-import time
-import json
-import os
-import re
-import queue
-import threading
+import argparse  # ★追加: 引数解析用
+import base64
 import datetime
 import io
+import json
+import os
+import queue
+import re
+import shutil
+import subprocess
+import sys
+import threading
+import time
+
+import keyboard
 import numpy as np
+import pyperclip
 import requests
 import sounddevice as sd
 import soundfile as sf
-import pyperclip
-import keyboard
-import shutil
-import subprocess
-import base64
-import argparse  # ★追加: 引数解析用
 
 from version import __version__
 
 # FLACタグ編集用 (あれば使う)
 try:
+    from mutagen import File as MutagenFile
     from mutagen.flac import Picture
     from mutagen.id3 import PictureType
-    from mutagen import File as MutagenFile
 
     HAS_MUTAGEN = True
 except ImportError:

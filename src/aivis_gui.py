@@ -1,18 +1,19 @@
-import customtkinter as ctk
+import argparse
+import ctypes
+import os
+import queue
+import re
 import sys
 import threading
 import time
+
+import customtkinter as ctk
 import pyperclip
-import queue
-from version import __version__
+from PIL import Image
+
 import aivis_reader
 from aivis_reader import get_project_root
-from PIL import Image
-import os
-import ctypes
-import argparse
-import re
-
+from version import __version__
 
 # テーマ設定
 ctk.set_appearance_mode("Dark")
@@ -428,13 +429,13 @@ class App(ctk.CTk):
         # 初期クリップボード取得
         try:
             self.last_text = pyperclip.paste()
-        except:
+        except Exception:
             self.last_text = ""
 
         while self.clipboard_running:
             try:
                 current_text = pyperclip.paste()
-            except:
+            except Exception:
                 current_text = ""
 
             if current_text and current_text != self.last_text:

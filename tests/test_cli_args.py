@@ -1,7 +1,9 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from aivis_reader import run_cli
 import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from aivis_reader import run_cli
 
 
 class TestCliArgs:

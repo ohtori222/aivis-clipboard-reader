@@ -1,6 +1,6 @@
+import glob
 import os
 import sys
-import glob
 
 try:
     from mutagen import File

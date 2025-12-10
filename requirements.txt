@@ -8,3 +8,6 @@ mutagen
 customtkinter
 packaging
 pillow
+black
+isort
+flake8

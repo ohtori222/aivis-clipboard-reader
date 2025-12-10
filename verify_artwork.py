@@ -1,10 +1,10 @@
-import sys
 import os
+import sys
 
 # srcディレクトリをパスに追加
 sys.path.append(os.path.join(os.getcwd(), "src"))
 
-from aivis_reader import ConfigManager
+from aivis_reader import ConfigManager  # noqa: E402
 
 
 def test_artwork_resolution():

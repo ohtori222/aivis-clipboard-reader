@@ -1,6 +1,8 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from aivis_reader import TaskManager, ConfigManager
+
+import pytest
+
+from aivis_reader import ConfigManager, TaskManager
 
 
 class TestTextCleaner:

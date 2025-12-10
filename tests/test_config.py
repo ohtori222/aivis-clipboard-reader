@@ -1,11 +1,10 @@
-import pytest
-from unittest.mock import MagicMock, patch
 import json
-import os
-import sys
+from unittest.mock import patch
+
+import pytest
 
 # Import src modules (mocks from conftest.py should be active)
-from aivis_reader import ConfigManager, get_project_root
+from aivis_reader import ConfigManager
 
 
 class TestConfigManager:

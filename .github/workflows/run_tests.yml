@@ -24,6 +24,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-mock
+          pip install black isort flake8
+
+      - name: Encure Code Quality (Lint & Format Check)
+        run: |
+          echo "Checking import sort order..."
+          isort . --check --diff
+          echo "Checking code formatting..."
+          black . --check --diff
+          echo "Checking static analysis..."
+          flake8 .
 
       - name: Run Tests
         run: |

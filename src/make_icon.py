@@ -1,5 +1,6 @@
-from PIL import Image
 import os
+
+from PIL import Image
 
 src = "assets/cover_sample.jpg"
 dst = "assets/icon.ico"

@@ -105,14 +105,15 @@ class App(ctk.CTk):
         icon_path = None
 
         root_dir = get_project_root()
-        icon_path = os.path.join(root_dir, icon_name)
+        # assetsフォルダ内を探す
+        icon_path = os.path.join(root_dir, "assets", icon_name)
 
         # 優先順位:
         # 1. PyInstallerバンドル内 (sys._MEIPASS)
-        # 2. get_project_root() で取得したパス
+        # 2. get_project_root()/assets/icon.ico
 
         if hasattr(sys, "_MEIPASS"):
-            bundled_path = os.path.join(sys._MEIPASS, icon_name)
+            bundled_path = os.path.join(sys._MEIPASS, "assets", icon_name)
             if os.path.exists(bundled_path):
                 icon_path = bundled_path
 
@@ -243,25 +244,36 @@ class App(ctk.CTk):
         artwork_path = self.cfg.get("artwork_path", "cover.jpg")
         root_dir = get_project_root()
 
-        # パスが相対パスならルート基準にする
+        # パスが相対パスなら...
         if not os.path.isabs(artwork_path):
-            artwork_path = os.path.join(root_dir, artwork_path)
+            # まず assets 直下を探す
+            assets_path = os.path.join(root_dir, "assets", artwork_path)
+            if os.path.exists(assets_path):
+                artwork_path = assets_path
+            else:
+                # なければルート基準 (互換性維持)
+                artwork_path = os.path.join(root_dir, artwork_path)
 
-        # 存在しない場合、カレントディレクトリの cover_sample.jpg を確認
+        # 存在しない場合、assets内の cover_sample.jpg を確認
         if not os.path.exists(artwork_path):
-            sample_path = os.path.join(root_dir, "cover_sample.jpg")
+            sample_path = os.path.join(root_dir, "assets", "cover_sample.jpg")
             if os.path.exists(sample_path):
                 artwork_path = sample_path
             else:
                 # それでもなければ既存の検索ロジック (cover.* の検索)
-                potential = [
-                    f
-                    for f in os.listdir(root_dir)
-                    if f.lower().startswith("cover.")
-                    and f.lower().endswith((".jpg", ".jpeg", ".png"))
-                ]
-                if potential:
-                    artwork_path = os.path.join(root_dir, potential[0])
+                # assets フォルダ内を検索対象にする
+                assets_dir = os.path.join(root_dir, "assets")
+                if os.path.exists(assets_dir):
+                    potential = [
+                        f
+                        for f in os.listdir(assets_dir)
+                        if f.lower().startswith("cover.")
+                        and f.lower().endswith((".jpg", ".jpeg", ".png"))
+                    ]
+                    if potential:
+                        artwork_path = os.path.join(assets_dir, potential[0])
+                    else:
+                        return
                 else:
                     return
 

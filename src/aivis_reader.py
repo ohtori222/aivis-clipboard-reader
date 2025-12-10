@@ -84,10 +84,12 @@ class ConfigManager:
         # デフォルトのアートワークが存在せず、サンプルがある場合はそちらを使用
         # パスはルートディレクトリ基準で解決する
         artwork_full_path = os.path.join(self.root_dir, self.data["artwork_path"])
-        sample_full_path = os.path.join(self.root_dir, "cover_sample.jpg")
+        # assetsフォルダ内のサンプルを確認
+        sample_full_path = os.path.join(self.root_dir, "assets", "cover_sample.jpg")
 
         if not os.path.exists(artwork_full_path) and os.path.exists(sample_full_path):
-            self.data["artwork_path"] = "cover_sample.jpg"
+            # 相対パスとして保存
+            self.data["artwork_path"] = os.path.join("assets", "cover_sample.jpg")
 
         self.load()
 

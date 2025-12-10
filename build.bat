@@ -25,8 +25,8 @@ echo This may take a while...
 
 pyinstaller --noconsole --onefile --clean ^
     --name "AivisClipboardReader" ^
-    --icon "icon.ico" ^
-    --add-data "icon.ico;." ^
+    --icon "assets\icon.ico" ^
+    --add-data "assets\icon.ico;assets" ^
     --add-data "%CTK_PATH%;customtkinter" ^
     --collect-all "src" ^
     --paths "src" ^
@@ -38,9 +38,10 @@ if %errorlevel% equ 0 (
     copy README.md dist\ > nul
     copy config.json dist\ > nul
 
-    REM 配布用にはサンプルアートワークを含める
-    if exist cover_sample.jpg copy cover_sample.jpg dist\ > nul
-    if exist cover_sample.png copy cover_sample.png dist\ > nul
+    REM `assets` フォルダをそのまま `dist` にコピー
+    if exist assets (
+        xcopy "assets" "dist\assets\" /E /I /Y > nul
+    )
 
     echo.
     echo ========================================================

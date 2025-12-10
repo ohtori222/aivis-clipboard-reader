@@ -166,7 +166,7 @@ Python 環境構築が面倒な場合、同梱の `build.bat` を実行するこ
 
 1.  以下のコマンドを実行します（Windows）。
     ```cmd
-    .\build.bat
+    .\scripts\build.bat
     ```
 2.  `dist` フォルダに `AivisClipboardReader.exe` が生成されます。
 3.  このファイルを実行するだけで、Python のインストールなしで利用可能です。

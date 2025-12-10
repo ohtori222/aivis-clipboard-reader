@@ -1,7 +1,5 @@
 import sys
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from aivis_reader import run_cli
 

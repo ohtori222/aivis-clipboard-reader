@@ -25,7 +25,6 @@ from version import __version__
 try:
     from mutagen import File as MutagenFile
     from mutagen.flac import Picture
-    from mutagen.id3 import PictureType
 
     HAS_MUTAGEN = True
 except ImportError:
@@ -168,7 +167,7 @@ class ConfigManager:
             try:
                 with open(local_config_path, "r", encoding="utf-8") as f:
                     save_data = json.load(f)
-            except:
+            except Exception:
                 pass
 
         for key in target_keys:

@@ -29,7 +29,8 @@ class TestCliArgs:
                 except KeyboardInterrupt:
                     pass
 
-                # Verification passed if we reached here without errors (coverage mainly)
+                # Verification passed if we reached here without errors
+                # (coverage mainly)
                 pass
 
     def test_placeholder(self):

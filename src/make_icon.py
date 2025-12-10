@@ -1,8 +1,8 @@
 from PIL import Image
 import os
 
-src = "cover_sample.jpg"
-dst = "icon.ico"
+src = "assets/cover_sample.jpg"
+dst = "assets/icon.ico"
 
 if os.path.exists(src):
     try:

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="cover_sample.jpg" width="150" height="150">
+  <img src="assets/cover_sample.jpg" width="150" height="150">
 </div>
 
 # AivisSpeech Clipboard Reader
@@ -79,7 +79,7 @@
    ※ その他の設定項目はソースコード内のデフォルト値が使われます。
 
 4. **アートワークの準備（任意）**
-   スクリプトと同じフォルダに `cover.jpg` (または `cover.png`) を置くと、生成される音声ファイルに埋め込まれます。
+   `assets` フォルダに `cover.jpg` (または `cover.png`) を置くと、生成される音声ファイルに埋め込まれます。
 
 ## ▶️ 使い方
 
@@ -90,7 +90,7 @@
 1.  AivisSpeech / VOICEVOX を起動します。
 2.  スクリプトを実行します。
     ```bash
-    python aivis_gui.py
+    python src/aivis_gui.py
     ```
 3.  ウィンドウが表示されます。この状態でテキストを **コピー (Ctrl+C)** すると、自動で読み上げが始まります。
     - **Dashboard**: 再生状態の確認、一時停止、停止、スキップ操作が可能です。
@@ -104,7 +104,7 @@
 1.  AivisSpeech / VOICEVOX を起動します。
 2.  スクリプトを実行します。
     ```bash
-    python aivis_reader.py
+    python src/aivis_reader.py
     ```
 3.  読み上げたいテキストを **コピー (Ctrl+C)** すると、自動で読み上げが始まります。
 
@@ -113,10 +113,10 @@
 ```bash
 # 日付を指定して起動 (過去ログの整理などに便利)
 # 保存先のフォルダ名とファイル名の日付部分が指定した値になります
-python aivis_gui.py --date 251206
+python src/aivis_gui.py --date 251206
 
 # 強制的にFLACで保存 (FFmpeg導入環境でもOpusを使わない場合)
-python aivis_gui.py --flac
+python src/aivis_gui.py --flac
 ```
 
 ※ `aivis_reader.py` でも同じ引数が使えます。

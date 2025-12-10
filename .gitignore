@@ -23,7 +23,7 @@ Aivis_AudioLog/
 config.local.json
 
 # 各ユーザーがローカルで用意するアートワークファイルのため除外。
-cover.jpg
+assets/cover.jpg
 
 # ── OSのシステムファイル ──
 .DS_Store

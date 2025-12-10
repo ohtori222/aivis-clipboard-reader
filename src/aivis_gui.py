@@ -10,6 +10,8 @@ from aivis_reader import get_project_root
 from PIL import Image
 import os
 import ctypes
+import argparse
+import re
 
 
 # テーマ設定
@@ -244,38 +246,10 @@ class App(ctk.CTk):
         artwork_path = self.cfg.get("artwork_path", "cover.jpg")
         root_dir = get_project_root()
 
-        # パスが相対パスなら...
+        # ConfigManagerで解決済みのパスを使用するが、
+        # 相対パスの場合はルート基準で結合する
         if not os.path.isabs(artwork_path):
-            # まず assets 直下を探す
-            assets_path = os.path.join(root_dir, "assets", artwork_path)
-            if os.path.exists(assets_path):
-                artwork_path = assets_path
-            else:
-                # なければルート基準 (互換性維持)
-                artwork_path = os.path.join(root_dir, artwork_path)
-
-        # 存在しない場合、assets内の cover_sample.jpg を確認
-        if not os.path.exists(artwork_path):
-            sample_path = os.path.join(root_dir, "assets", "cover_sample.jpg")
-            if os.path.exists(sample_path):
-                artwork_path = sample_path
-            else:
-                # それでもなければ既存の検索ロジック (cover.* の検索)
-                # assets フォルダ内を検索対象にする
-                assets_dir = os.path.join(root_dir, "assets")
-                if os.path.exists(assets_dir):
-                    potential = [
-                        f
-                        for f in os.listdir(assets_dir)
-                        if f.lower().startswith("cover.")
-                        and f.lower().endswith((".jpg", ".jpeg", ".png"))
-                    ]
-                    if potential:
-                        artwork_path = os.path.join(assets_dir, potential[0])
-                    else:
-                        return
-                else:
-                    return
+            artwork_path = os.path.join(root_dir, artwork_path)
 
         if os.path.exists(artwork_path):
             try:
@@ -484,5 +458,38 @@ class App(ctk.CTk):
 
 
 if __name__ == "__main__":
+    # 引数解析
+    parser = argparse.ArgumentParser(description="AivisSpeech Clipboard Reader (GUI)")
+    parser.add_argument(
+        "-f",
+        "--flac",
+        action="store_true",
+        help="強制的にFLAC形式で保存します (FFmpegがある場合でも)",
+    )
+    parser.add_argument(
+        "-d",
+        "--date",
+        type=str,
+        help="保存時の日付を強制的に指定します (形式: YYMMDD, 例: 251206)",
+    )
+    args = parser.parse_args()
+
+    # 日付オプションのバリデーション
+    if args.date:
+        if not re.match(r"^\d{6}$", args.date):
+            print(
+                "❌ エラー: 日付形式が正しくありません。YYMMDD形式 (6桁の数字) で指定してください。"
+            )
+            sys.exit(1)
+        aivis_reader.cfg["override_date"] = args.date
+        print(f"📅 日付上書きモード: {args.date} として保存します")
+
+    # FLAC強制オプション
+    cfg_force_flac = aivis_reader.cfg.get("force_flac", False)
+    if args.flac or cfg_force_flac:
+        aivis_reader.cfg["force_flac"] = True  # 設定オブジェクトを更新
+        if args.flac:
+            print("🔧 オプション指定: 強制的にFLACで保存します。")
+
     app = App()
     app.mainloop()

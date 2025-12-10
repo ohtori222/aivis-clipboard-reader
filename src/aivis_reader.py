@@ -81,17 +81,33 @@ class ConfigManager:
 
         self.root_dir = get_project_root()
 
-        # デフォルトのアートワークが存在せず、サンプルがある場合はそちらを使用
-        # パスはルートディレクトリ基準で解決する
-        artwork_full_path = os.path.join(self.root_dir, self.data["artwork_path"])
-        # assetsフォルダ内のサンプルを確認
-        sample_full_path = os.path.join(self.root_dir, "assets", "cover_sample.jpg")
-
-        if not os.path.exists(artwork_full_path) and os.path.exists(sample_full_path):
-            # 相対パスとして保存
-            self.data["artwork_path"] = os.path.join("assets", "cover_sample.jpg")
-
         self.load()
+
+        # アートワークの自動検出ロジック (設定読み込み後に実行)
+        # 現在設定されているパスが存在しない場合のみ、代替パスを探す
+        current_artwork_full = os.path.join(self.root_dir, self.data["artwork_path"])
+
+        if not os.path.exists(current_artwork_full):
+            # 優先順位:
+            # 1. assetsフォルダ内の cover.jpg / cover.png (README推奨)
+            # 2. assetsフォルダ内の cover_sample.jpg (デフォルト)
+
+            possible_paths = [
+                os.path.join("assets", "cover.jpg"),  # assets
+                os.path.join("assets", "cover.png"),  # assets (png)
+                os.path.join("assets", "cover_sample.jpg"),  # assets (sample)
+            ]
+
+            found_artwork = None
+            for p in possible_paths:
+                full_p = os.path.join(self.root_dir, p)
+                if os.path.exists(full_p):
+                    found_artwork = p
+                    break
+
+            if found_artwork:
+                self.data["artwork_path"] = found_artwork
+                print(f"🎨 アートワーク自動検出: {found_artwork}")
 
     def load(self):
         config_path = os.path.join(self.root_dir, "config.json")

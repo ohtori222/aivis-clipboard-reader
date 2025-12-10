@@ -65,11 +65,29 @@ jobs:
               Write-Error "dist folder not found! Build failed?"
           }
 
+      - name: Generate Release Body
+        shell: pwsh
+        run: |
+          $tagName = "${{ github.ref_name }}"
+          $repo = "${{ github.repository }}"
+          $artifactName = "${{ github.event.repository.name }}_${tagName}_win_x64.zip"
+
+          # ダウンロードリンクの生成
+          $body = @"
+          # 📥 ダウンロード
+          **[👉 Windows版アプリをダウンロード ($artifactName)](https://github.com/$repo/releases/download/$tagName/$artifactName)**
+
+          EXE版はPython環境がなくても動きます。
+          "@
+
+          $body | Out-File -FilePath release_header.md -Encoding utf8
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: "*_win_x64.zip"
+          body_path: release_header.md
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

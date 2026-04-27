@@ -1,4 +1,4 @@
-urllib3>=2.6.1
+urllib3>=2.6.3
 requests
 numpy
 sounddevice
